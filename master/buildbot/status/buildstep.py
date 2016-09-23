@@ -390,24 +390,25 @@ class BuildStepStatus(styles.Versioned):
 
     def upgradeToVersion5(self):
         # Convert old URL dictionary into new URL/artifacts/dependencies arrays
-        newUrls = []
-        self.dependencies = []
-        if type(self.urls) == dict:
-            for urlKey in self.urls:
-                value = self.urls[urlKey]
-                if type(value) == dict:
-                    self.dependencies.append(dict(name=urlKey, url=value['url'], results=value['results']))
-                else:
-                    newUrls.append(dict(name=urlKey, url=value))
+        if not hasattr(self, "dependencies") or type(self.urls) == dict:
+            newUrls = []
+            self.dependencies = []
+            if type(self.urls) == dict:
+                for urlKey in self.urls:
+                    value = self.urls[urlKey]
+                    if type(value) == dict:
+                        self.dependencies.append(dict(name=urlKey, url=value['url'], results=value['results']))
+                    else:
+                        newUrls.append(dict(name=urlKey, url=value))
 
-        self.urls = []
-        self.artifacts = []
-        # If it's an artifact-based step, all former URLs should be treated as artifacts
-        if hasattr(self, "step_type"):
-            if ("buildbot.steps.artifact" in self.step_type):
-                self.artifacts = newUrls
-            else:
-                self.urls = newUrls
+            self.urls = []
+            self.artifacts = []
+            # If it's an artifact-based step, all former URLs should be treated as artifacts
+            if hasattr(self, "step_type"):
+                if ("buildbot.steps.artifact" in self.step_type):
+                    self.artifacts = newUrls
+                else:
+                    self.urls = newUrls
 
         self.wasUpgraded = True
 
