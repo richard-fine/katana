@@ -517,6 +517,8 @@ class KafkaStatusPush(StatusPush):
         return {
             'name': build.builder.name,
             'number': build.number,
+            'buildChainID': build.buildChainID,
+            'buildRequestIDs': build.brids,
             'slave': {
                 'name': build.slavename
             },
