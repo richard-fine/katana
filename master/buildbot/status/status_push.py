@@ -14,6 +14,15 @@
 # Copyright Buildbot Team Members
 
 from __future__ import with_statement
+
+import socket
+
+import buildbot
+import pykafka
+from twisted.internet.protocol import ClientFactory
+
+from buildbot.status.build import BuildStatus
+
 try:
     from autobahn.twisted.websocket import WebSocketClientFactory, WebSocketClientProtocol
     assert WebSocketClientFactory
@@ -470,6 +479,150 @@ class AutobahnProtocol(WebSocketClientProtocol):
 
     def onClose(self, wasClean, code, reason):
         print("Connection to autobahn server closed: {0}".format(reason))
+
+
+class KafkaStatusPush(StatusPush):
+    """Experimental status push functionality for Kafka."""
+
+    def __init__(self, host, topic):
+        super(KafkaStatusPush, self).__init__(lambda: None)  # pushing messages immediately
+        self.host = host
+        self.client = pykafka.KafkaClient(hosts=host)
+        self.hostname = socket.getfqdn()
+        self.topic = self.client.topics[topic]
+        self.producer = self.topic.get_producer(sync=True)
+
+    def _kafkaPush(self, message):
+        self.producer.produce(json.dumps(message))
+
+    @staticmethod
+    def _parseOwner(owner):
+        username, email = owner.split(' ')
+        return {
+            "username": username,
+            "email": email,
+        }
+
+    def _createHeader(self):
+        return {
+            'version': 1,
+            'timestamp': datetime.datetime.utcnow().isoformat(),
+            'hostname': self.hostname,
+            'producer': 'katana-' + buildbot.version
+        }
+
+    def _createBuild(self, build):
+        # type: (BuildStatus) -> dict[str, T]
+
+        return {
+            'name': build.builder.name,
+            'number': build.number,
+            'slave': {
+                'name': build.slavename
+            },
+            'builder': {
+                'name': build.builder.name,
+                'displayName': build.builder.getFriendlyName(),
+                'url': build.builder.master.status.getURLForThing(build.builder)
+            },
+            'sourceStamps': [ss.asDict() for ss in build.getSourceStamps()],
+            'reason': build.reason,
+            'owners': map(self._parseOwner, build.owners),
+            'url': build.builder.master.status.getURLForThing(build)['path']
+        }
+
+    def buildFinished(self, builderName, build, results):
+        # type: (str, BuildStatus, int) -> KafkaStatusPush
+
+        buildDict = self._createBuild(build)
+        buildDict['result'] = results
+
+        self._kafkaPush(
+            {
+                'header': self._createHeader(),
+                'event': 'buildFinished',
+                'builtbotURL': build.builder.master.config.buildbotURL,
+                'build': buildDict
+            })
+        return self
+
+    def buildStarted(self, builderName, build):
+        # type: (str, BuildStatus) -> KafkaStatusPush
+
+        self._kafkaPush(
+            {
+                'header': self._createHeader(),
+                'event': 'buildStarted',
+                'builtbotURL': build.builder.master.config.buildbotURL,
+                'build': self._createBuild(build)
+            })
+        return self
+
+    def initialPush(self):
+        return self
+
+    def finalPush(self):
+        return self
+
+    def requestSubmitted(self, request):
+        return self
+
+    def requestCancelled(self, builder, request):
+        return self
+
+    def buildsetSubmitted(self, buildset):
+        return self
+
+    def builderAdded(self, builderName, builder, friendly_name):
+        return self
+
+    def builderChangedState(self, builderName, state):
+        return self
+
+    def buildETAUpdate(self, build, ETA):
+        return self
+
+    def stepStarted(self, build, step):
+        return self
+
+    def stepTextChanged(self, build, step, text):
+        return self
+
+    def stepText2Changed(self, build, step, text2):
+        return self
+
+    def stepETAUpdate(self, build, step, ETA, expectations):
+        return self
+
+    def logStarted(self, build, step, log):
+        return self
+
+    def logFinished(self, build, step, log):
+        return self
+
+    def stepFinished(self, build, step, results):
+        return self
+
+    def builderRemoved(self, builderName):
+        return self
+
+    def changeAdded(self, change):
+        return self
+
+    def slaveConnected(self, slavename):
+        return self
+
+    def slaveDisconnected(self, slavename):
+        return self
+
+    def slavePaused(self, slavename, url, user):
+        return self
+
+    def slaveUnpaused(self, slavename, url, user):
+        return self
+
+    def slaveShutdownGraceFully(self, slavename, url, user):
+        return self
 
 
 class AutobahnFactory(WebSocketClientFactory):
