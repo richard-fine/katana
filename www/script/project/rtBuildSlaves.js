@@ -36,9 +36,9 @@ define(function (require) {
                 { "mData": null, "bSortable": true, "sWidth": "10%"},
                 { "mData": null, "sWidth": "10%"},
                 { "mData": null, "sWidth": "10%" },
-                { "mData": null, "sWidth": "5%" },
-                { "mData": null, "sWidth": "10%" },
                 { "mData": null, "sWidth": "5%" }
+                /*{ "mData": null, "sWidth": "10%" },
+                { "mData": null, "sWidth": "10%" }*/
             ];
 
             options.aoColumnDefs = [
@@ -74,8 +74,10 @@ define(function (require) {
                     }
 
                 },
-                rtTable.cell.slaveHealth(5),
-                {
+                rtTable.cell.slaveHealth(5)
+
+                // TODO: this should remain uncommented until moving Katana to Dublin
+                /*{
                     "aTargets": [ 6 ],
                     "sClass": "txt-align-left",
                     "mRender": function (data, full, type) {
@@ -88,7 +90,7 @@ define(function (require) {
                     "mRender": function (data, full, type) {
                         return type.tags !== undefined ? type.tags : 'Not Available';
                     }
-                }
+                }*/
             ];
 
             return dt.initTable($tableElem, options);
