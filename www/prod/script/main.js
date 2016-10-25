@@ -50990,6 +50990,8 @@ define('rtBuildSlaves',['require','jquery','realtimePages','helpers','project/da
                 { "mData": null, "bSortable": true, "sWidth": "10%"},
                 { "mData": null, "sWidth": "10%"},
                 { "mData": null, "sWidth": "10%" },
+                { "mData": null, "sWidth": "5%" },
+                { "mData": null, "sWidth": "10%" },
                 { "mData": null, "sWidth": "5%" }
             ];
 
@@ -51026,7 +51028,21 @@ define('rtBuildSlaves',['require','jquery','realtimePages','helpers','project/da
                     }
 
                 },
-                rtTable.cell.slaveHealth(5)
+                rtTable.cell.slaveHealth(5),
+                {
+                    "aTargets": [ 6 ],
+                    "sClass": "txt-align-left",
+                    "mRender": function (data, full, type) {
+                        return type.fqdn !== undefined ? type.fqdn : 'Not Available';
+                    }
+                },
+                {
+                    "aTargets": [ 7 ],
+                    "sClass": "txt-align-left",
+                    "mRender": function (data, full, type) {
+                        return type.tags !== undefined ? type.tags : 'Not Available';
+                    }
+                }
             ];
 
             return dt.initTable($tableElem, options);
