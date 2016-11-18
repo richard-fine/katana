@@ -21,7 +21,8 @@ from buildbot.interfaces import BuildSlaveTooOldError
 
 class SlaveBuildStep(buildstep.BuildStep):
     def describe(self, done=False):
-        return self.descriptionDone if done else self.description
+        description = self.descriptionDone if done else self.description
+        return description or [self.name]
 
 class SetPropertiesFromEnv(SlaveBuildStep):
     """
@@ -162,8 +163,8 @@ class RemoveDirectory(SlaveBuildStep):
     Remove a directory tree on the slave.
     """
     name='RemoveDirectory'
-    description=['Deleting']
-    descriptionDone=['Deleted']
+    description=None
+    descriptionDone=None
 
     renderables = [ 'dir' ]
 
@@ -171,17 +172,17 @@ class RemoveDirectory(SlaveBuildStep):
     flunkOnFailure = True
 
     def __init__(self, dir, description=None, descriptionDone=None, **kwargs):
-        if description:
-            self.description = description
+        self.description = description
         if isinstance(self.description, str):
             self.description = [self.description]
-        if descriptionDone:
-            self.descriptionDone = descriptionDone
+
+        self.descriptionDone = descriptionDone
         if isinstance(self.descriptionDone, str):
             self.descriptionDone = [self.descriptionDone]
 
         buildstep.BuildStep.__init__(self, **kwargs)
         self.dir = dir
+
 
     def start(self):
         slavever = self.slaveVersion('rmdir')
@@ -194,12 +195,19 @@ class RemoveDirectory(SlaveBuildStep):
         d.addErrback(self.failed)
 
     def commandComplete(self, cmd):
+        description = self.describe(done=True) or ['rmdir', self.dir]
         if cmd.didFail():
-            self.step_status.setText(["Delete failed."])
+            self.step_status.setText(description + ["failed"])
             self.finished(FAILURE)
             return
-        self.step_status.setText(self.describe(done=True))
+
+        self.step_status.setText(description)
         self.finished(SUCCESS)
+
+    def describe(self, done=False):
+        description = self.descriptionDone if done else self.description
+        return  description or ['rmdir', self.dir]
+
 
 class MakeDirectory(SlaveBuildStep):
     """

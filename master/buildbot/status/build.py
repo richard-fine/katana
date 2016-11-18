@@ -245,6 +245,26 @@ class BuildStatus(styles.Versioned, properties.PropertiesMixin):
                 logs.append(loog)
         return logs
 
+    def getCustomUrls(self):
+        """
+        If the build is finished returns formated custom urls
+        :return: Configured custom build urls in the format [{'name': name, 'url': ur}]
+        """
+        customUrls = []
+        if self.isFinished():
+            builderConfig = self.builder.getBuilderConfig()
+            if builderConfig:
+                customUrls = builderConfig.getCustomBuildUrls(
+                        buildbotUrl=self.master.status.getBuildbotURL(),
+                        buildNumber=self.number,
+                        buildUrl=self.getBuildUrl()
+                )
+        return customUrls
+
+    def getBuildUrl(self):
+        return self.master.status.getURLForThing(self)['path'] if 'path' in self.master.status.getURLForThing(
+            self) else ''
+
     # subscription interface
 
     def subscribe(self, receiver, updateInterval=None):
@@ -346,6 +366,7 @@ class BuildStatus(styles.Versioned, properties.PropertiesMixin):
     def setText(self, text):
         assert isinstance(text, (list, tuple))
         self.text = text
+
     def setResults(self, results):
         self.results = results
 
