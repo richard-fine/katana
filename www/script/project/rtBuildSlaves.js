@@ -57,7 +57,7 @@ define(function (require) {
                     "aTargets": [ 2 ],
                     "sClass": "txt-align-left",
                     "mRender": function (data, full, type) {
-                        return type.fqdn !== undefined ? type.name : 'Not Available';
+                        return type.fqdn !== undefined ? type.fqdn : 'Not Available';
                     }
                 },
                 rtTable.cell.slaveStatus(3),
