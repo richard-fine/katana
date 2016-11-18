@@ -37,7 +37,6 @@ define(function (require) {
                 { "mData": null, "sWidth": "10%"},
                 { "mData": null, "sWidth": "10%" },
                 { "mData": null, "sWidth": "5%" },
-                { "mData": null, "sWidth": "10%" },
                 { "mData": null, "sWidth": "10%" }
             ];
 
@@ -58,7 +57,7 @@ define(function (require) {
                     "aTargets": [ 2 ],
                     "sClass": "txt-align-left",
                     "mRender": function (data, full, type) {
-                        return type.name !== undefined ? type.name : 'Not Available';
+                        return type.fqdn !== undefined ? type.name : 'Not Available';
                     }
                 },
                 rtTable.cell.slaveStatus(3),
@@ -77,13 +76,6 @@ define(function (require) {
                 rtTable.cell.slaveHealth(5),
                 {
                     "aTargets": [ 6 ],
-                    "sClass": "txt-align-left",
-                    "mRender": function (data, full, type) {
-                        return type.fqdn !== undefined ? type.fqdn : 'Not Available';
-                    }
-                },
-                {
-                    "aTargets": [ 7 ],
                     "sClass": "txt-align-left",
                     "mRender": function (data, full, type) {
                         return type.tags !== undefined ? type.tags : 'Not Available';
