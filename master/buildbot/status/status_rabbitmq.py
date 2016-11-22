@@ -62,5 +62,5 @@ class RabbitMQStatusPush(QueuedStatusPush):
             return True, None
 
         except Exception as e:
-            log.msg(Failure(), "from RabbitMQStatusPush.pushData")
+            log.err(Failure(), "RabbitMQStatusPush.pushData failed")
             return False, e
