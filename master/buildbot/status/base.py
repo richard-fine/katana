@@ -26,7 +26,7 @@ class StatusReceiverBase:
     def requestSubmitted(self, request):
         pass
 
-    def requestCancelled(self, builder, request):
+    def requestCancelled(self, request):
         pass
 
     def buildsetSubmitted(self, buildset):

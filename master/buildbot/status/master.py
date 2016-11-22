@@ -621,7 +621,7 @@ class Status(config.ReconfigurableServiceMixin, service.MultiService):
                                                 notif['brid'], self)
             for observer in self._builder_observers[buildername]:
                 if hasattr(observer, 'requestCancelled'):
-                    eventually(observer.requestSubmitted, brs)
+                    eventually(observer.requestCancelled, brs)
 
     def get_rev_url(self, rev, repo):
         # Lazy load this so that the config is ready for us

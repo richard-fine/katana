@@ -257,8 +257,8 @@ class StatusPush(StatusReceiverMultiService):
     def requestSubmitted(self, request):
         self.push('requestSubmitted', request=request)
 
-    def requestCancelled(self, builder, request):
-        self.push('requestCancelled', builder=builder, request=request)
+    def requestCancelled(self, request):
+        self.push('requestCancelled', request=request)
 
     def buildsetSubmitted(self, buildset):
         self.push('buildsetSubmitted', buildset=buildset)
@@ -609,8 +609,10 @@ class AutobahnStatusPush(StatusPush):
                   project=builder.project)
 
     @defer.inlineCallbacks
-    def requestCancelled(self, builder, request):
+    def requestCancelled(self, request):
         stamps = yield request.getSourceStamps()
+        builder = self.status.getBuilder(request.buildername)
+
         self.push('requestCancelled',
                   builderName=request.buildername,
                   sources=self.source_stamps_to_dict(stamps),

@@ -856,10 +856,9 @@ class IStatusReceiver(Interface):
         @type request: implementor of L{IBuildRequestStatus}
         """
 
-    def requestCancelled(builder, request):
+    def requestCancelled(request):
         """A BuildRequest has been cancelled on the given Builder.
 
-        @type builder: L{buildbot.status.builder.BuilderStatus}
         @type request: implementor of L{IBuildRequestStatus}
         """
 
