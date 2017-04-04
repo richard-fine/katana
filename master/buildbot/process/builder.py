@@ -102,6 +102,8 @@ class Builder(config.ReconfigurableServiceMixin,
                     builder_config.description,
                     project=builder_config.project)
 
+        self.reconfigSlaves(builder_config)
+
         self.config = builder_config
 
         self.builder_status.setDescription(builder_config.description)
@@ -114,6 +116,22 @@ class Builder(config.ReconfigurableServiceMixin,
         self.builder_status.setTags(builder_config.tags)
 
         return defer.succeed(None)
+
+    def reconfigSlaves(self, builder_config):
+        if self.config:
+            currentSlaves = self.config.slavenames + (self.config.startSlavenames or [])
+
+            newSlaves = builder_config.slavenames + (builder_config.startSlavenames or [])
+
+            removedSlaves = set(currentSlaves) - set(newSlaves)
+
+            if removedSlaves:
+                slaves = {sb.slave.slavename: sb.slave for sb in self.getAllSlaves()}
+
+                for slavename in removedSlaves:
+                    slave = slaves.get(slavename)
+                    if slave:
+                        self.detached(slave)
 
     def stopService(self):
 
@@ -620,6 +638,7 @@ class Builder(config.ReconfigurableServiceMixin,
     def _resubmit_buildreqs(self, out=None, requests=None):
         brids = [br.id for br in requests]
         yield self.master.db.buildrequests.unclaimBuildRequests(brids, results=BEGINNING)
+        self.master.botmaster.maybeStartBuildsForBuilder(self.name)
         defer.returnValue(out)
 
     def setExpectations(self, progress):
