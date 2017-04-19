@@ -218,6 +218,7 @@ class BotMaster(config.ReconfigurableServiceMixin, service.MultiService):
             for n in removed_names:
                 slave = old_by_name[n]
 
+                yield slave.disconnect()
                 del self.slaves[n]
                 slave.master = None
                 slave.botmaster = None

@@ -120,6 +120,9 @@ class FakeBuildSlave(config.ReconfigurableServiceMixin, service.Service):
         self.reconfig_count += 1
         return defer.succeed(None)
 
+    def disconnect(self):
+        pass
+
 
 class FakeBuildSlave2(FakeBuildSlave):
     pass
