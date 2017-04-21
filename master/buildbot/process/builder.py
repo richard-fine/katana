@@ -138,7 +138,7 @@ class Builder(config.ReconfigurableServiceMixin,
         d = defer.maybeDeferred(lambda:
                 service.MultiService.stopService(self))
 
-        if self.building:
+        if  self.building and self.master.status.getBuilder(self.name):
             for b in self.building:
                 d.addCallback(self._resubmit_buildreqs, b.requests)
                 d.addErrback(log.err)

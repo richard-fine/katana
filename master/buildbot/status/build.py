@@ -522,6 +522,9 @@ class BuildStatus(styles.Versioned, properties.PropertiesMixin):
 
     @defer.inlineCallbacks
     def stopBuild(self, reason, result=None):
+        if self.isFinished():
+            return
+
         c = interfaces.IControl(self.master)
         buildername = self.getBuilder().getName()
         bldrc = c.getBuilder(buildername)
@@ -529,8 +532,6 @@ class BuildStatus(styles.Versioned, properties.PropertiesMixin):
             bldc = bldrc.getBuild(self.getNumber())
             if bldc:
                 yield bldc.stopBuild(reason=reason, result=result)
-
-        defer.succeed(None)
 
     def cancelYourself(self):
         self.results = CANCELED
