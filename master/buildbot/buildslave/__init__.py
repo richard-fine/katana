@@ -363,8 +363,9 @@ class AbstractBuildSlave(config.ReconfigurableServiceMixin, pb.Avatar,
                 if buildername in removedBuilderList:
                     selected_slave = build_status.getProperty('selected_slave')
                     result = INTERRUPTED if selected_slave and selected_slave == self.slavename else RETRY
-                    reason = 'Slave %s reconfigured, it has been removed from this builder.' % self.slavename
-                    yield build_status.stopBuild(reason=reason, result=result)
+                    reason = "Slave %s reconfigured, it has been removed from this builder." % self.slavename
+                    text = ["Katana has been reconfigured, it will automatically retry this build"]
+                    yield build_status.stopBuild(reason=reason, result=result, text=text)
 
     def updateSlave(self):
         """Called to add or remove builders after the slave has connected.

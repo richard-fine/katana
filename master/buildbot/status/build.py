@@ -521,7 +521,7 @@ class BuildStatus(styles.Versioned, properties.PropertiesMixin):
             s.checkLogfiles()
 
     @defer.inlineCallbacks
-    def stopBuild(self, reason, result=None):
+    def stopBuild(self, reason, result=None, text=None):
         if self.isFinished():
             return
 
@@ -531,7 +531,7 @@ class BuildStatus(styles.Versioned, properties.PropertiesMixin):
         if bldrc:
             bldc = bldrc.getBuild(self.getNumber())
             if bldc:
-                yield bldc.stopBuild(reason=reason, result=result)
+                yield bldc.stopBuild(reason=reason, result=result, text=text)
 
     def cancelYourself(self):
         self.results = CANCELED

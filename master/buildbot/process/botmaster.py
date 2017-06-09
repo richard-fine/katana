@@ -253,7 +253,7 @@ class BotMaster(config.ReconfigurableServiceMixin, service.MultiService):
 
         reason = "Builder %s has been removed" % builder.name
         for build_status in builder.builder_status.currentBuilds:
-            yield build_status.stopBuild(reason=reason, result=INTERRUPTED)
+            yield build_status.stopBuild(reason=reason, result=INTERRUPTED, text=[reason])
 
     @defer.inlineCallbacks
     def reconfigServiceBuilders(self, new_config):
