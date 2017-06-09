@@ -544,11 +544,10 @@ class Build(properties.PropertiesMixin):
         log.msg("%s.lostRemote" % self)
         self.remote = None
         self.result = RETRY
-        self.text = ["lost", "remote"]
+        self.text = ["Katana will automatically retry this build"]
         if self.currentStep:
             # this should cause the step to finish.
             log.msg(" stopping currentStep", self.currentStep)
-            self.text += ["slave"]
             self.currentStep.addErrorResult(Failure(error.ConnectionLost()))
             self.currentStep.interrupt(Failure(error.ConnectionLost()))
         else:
