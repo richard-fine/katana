@@ -499,8 +499,9 @@ class KatanaBuildChooser(BasicBuildChooser):
             breq = yield self._getBuildRequestForBrdict(br)
 
             self.setupNextBuildRequest(bldr, breq)
-            if breq.checkMerges and (yield self.mergeCompatibleBuildRequests(breq, queue)):
-                continue
+            # TODO FIX: Merging has been disable since it has a bug that prevents the queue from continue processing
+            #if breq.checkMerges and (yield self.mergeCompatibleBuildRequests(breq, queue)):
+            #    continue
 
             def getSlavepool():
                 if queue == Queue.unclaimed:
