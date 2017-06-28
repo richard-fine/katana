@@ -1,0 +1,11 @@
+{
+  "BaseAddress": "https://staging-katana.bf.unity3d.com",
+  "TestSetup": [
+    {
+      "name": "default",
+      "project": "Unity",
+      "builder": "proj0-zUWPTests",
+      "branch" :  "trunk"
+    }
+  ]
+}
