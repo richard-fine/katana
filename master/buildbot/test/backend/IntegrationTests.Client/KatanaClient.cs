@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Net.Http.Headers;
+
 
 namespace Unity.Katana.IntegrationTests.Client
 {
@@ -240,6 +242,14 @@ namespace Unity.Katana.IntegrationTests.Client
             return response;
         }
 
+
+        /// <summary>
+        /// Give a revision number, to find its build number on a builder.
+        /// </summary>
+        /// <param name="revision"></param>
+        /// <param name="builder"></param>
+        /// <param name="num">How many build on that build will be searched, default 3</param>
+        /// <returns></returns>
         public int GetBuildNumberFromRevision(string revision, string builder, int num = 3)
         {
             int buildnr = -1;
@@ -248,18 +258,61 @@ namespace Unity.Katana.IntegrationTests.Client
             for (int i = 1; i <= num; i++)
             {
                 string iStr = (i * -1).ToString();
-                string rev = content[iStr]["sourceStamps"][0]["revision"].ToString();
+                string rev = content[iStr]["sourceStamps"][0]["revision_short"].ToString();
                 
                 if (rev == revision)
-                {
-                    buildnr = Convert.ToInt16(content[iStr]["number"].ToString());
+                {                 
+                    buildnr = (int)content[iStr]["number"];
                     break;
                 }                
             }
             return buildnr;
         }
 
-                
+        /// <summary>
+        /// Give a revision, retrun X number of 'build number' on that builder. 
+        /// </summary>
+        /// <param name="revision"></param>
+        /// <param name="builder"></param>
+        /// <param name="X">How many build numbers will be return.</param>
+        /// <param name="num">How many builds will be searched on that builder, default is 3.</param>
+        /// <returns></returns>
+        /// <remarks>Possible in 'num' builds, there are less than X builds having the given revision number.</remarks>
+        public List<int> GetXBuildNumberFromRevision(string revision, string builder, int X, int num = 3)
+        {
+            List<int> buildsnr = new List<int>();
+            //List<int> buildsnr = Enumerable.Repeat(-1, X - 1).ToList();
+            var resp = GetLastXBuilds(builder, num);
+            var content = JObject.Parse(resp.Result.Content.ReadAsStringAsync().Result);
+            //// Loop 'num' times, to find the build which has a match of revision number,  ////
+            //// and add the build number into list ////
+            for (int i = 1; i <= num; i++)
+            {
+                string iStr = (i * -1).ToString();
+                string rev = content[iStr]["sourceStamps"][0]["revision_short"].ToString();
+
+                if (rev == revision)
+                {                    
+                    buildsnr.Add((int)content[iStr]["number"]);
+                    if (buildsnr.Count >= X)
+                    {
+                        break;
+                    }                                       
+                }
+            }
+
+            //// If less than X match find, padding -1 in to the list ////
+            if (buildsnr.Count < X )
+            {
+                for (int i = buildsnr.Count; i < X; i++)
+                {
+                    buildsnr[i] = -1;
+                }
+            }
+
+            return buildsnr;
+        }
+
         #endregion
 
 
@@ -277,16 +330,17 @@ namespace Unity.Katana.IntegrationTests.Client
 
             var slctslave = slave == null ? "default" : slave;
             List<string> payload = new List<string>();
-            payload.Add("forcescheduler=unityBuildersWithSmartSelect [force]");
+            //payload.Add($"forcescheduler={project.ToLower()}BuildersWithSmartSelect [force]");
+            payload.Add($"forcescheduler={project.ToLower()}+%5Bforce%5D");
             payload.Add($"selected_slave={slctslave}");
             payload.Add($"priority={priority}");
             payload.Add("reason=IntegrationTest");
-            payload.Add($"unity_revision={revision}");
+            payload.Add($"{project.ToLower()}_revision={revision}");
             if (force)
             {
                 payload.Add("checkbox=force_rebuild");
             }
-
+            
             string content = string.Join("&", payload);
             HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
             return response;
@@ -298,6 +352,13 @@ namespace Unity.Katana.IntegrationTests.Client
                 $"{project.ToLower()}_branch={branch}";
             string content = "comments=Backend Integration Test";
             HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
+            return response;
+        }
+
+        public async Task<HttpResponseMessage> StopBuild(string url)
+        {            
+            string content = "comments=Backend Integration Test";
+            HttpResponseMessage response = await SendPostRequest(url, content, ContentType.wwwForm);
             return response;
         }
 

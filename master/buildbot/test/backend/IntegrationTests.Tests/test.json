@@ -5,7 +5,14 @@
       "name": "default",
       "project": "Unity",
       "builder": "proj0-zUWPTests",
-      "branch" :  "trunk"
+      "branch": "trunk"
+    },
+    {
+      "name": "UseSpecifiedSlaveTest",
+      "project": "Brotli",
+      "builder": "proj32-Build Brotli [linux]",
+      "branch": "master"
     }
+
   ]
 }
