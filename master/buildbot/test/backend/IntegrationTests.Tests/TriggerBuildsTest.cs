@@ -90,8 +90,7 @@ namespace Unity.Katana.IntegrationTests.Tests
             }
 #endregion
 
-            #region clean up and assertion
-            client.Dispose();
+            #region clean up and assertion            
             WriteTraceToFile(myTextListener);
 
             (build1 > build3 && build3 > build2).Should().BeTrue("The build number should be ordered " +
@@ -256,7 +255,7 @@ namespace Unity.Katana.IntegrationTests.Tests
                     .IgnoreAnyExceptions<Xunit.Sdk.XunitException>()
                     .AddResult(errmsgs);
 
-            client.Dispose();
+           
             WriteTraceToFile(myTextListener);
             AssertTestcase(errmsgs);
             #endregion
