@@ -30,24 +30,28 @@ namespace Unity.Katana.IntegrationTests.Tests
             TextWriterTraceListener myTextListener = SetupTraceFile("TriggerBuildTest.log");
             var client = new KatanaClient();
 
-            JObject settings = JObject.Parse(File.ReadAllText(settingfile));            
-            client.SetBaseAddress(settings["BaseAddress"].ToString());
+            JObject settings = JObject.Parse(File.ReadAllText(settingfile));
+            string _baseAddress = settings["BaseAddress"].ToString();
+            client.SetBaseAddress(_baseAddress);
+            Trace.WriteLine($"Set base address {_baseAddress}");
             var setup = settings["TestSetup"].Where( x => (string)x["name"] == "default").ToArray().First();
             var project = setup["project"].ToString();
             var builder = setup["builder"].ToString();
             var branch = setup["branch"].ToString();
+            Trace.WriteLine($"Read parameter project : {project}, builder: {builder}, branch: {branch}");
+
             #endregion
 
             #region action
             //// launch 2 setup builds to make the slave busy  ////
-            await client.LaunchBuild(project, builder, branch, "10000001", "99");
-            await client.LaunchBuild(project, builder, branch, "10000002", "99");
+            await client.LaunchBuild(project, builder, branch, "24c95392f5c2", "99");
+            await client.LaunchBuild(project, builder, branch, "8d4e8eefeb52", "99");
             Trace.WriteLine("Two setup builds are launched");
             Thread.Sleep(3000);
             //// launch 3 test builds. ////
-            await client.LaunchBuild(project, builder, branch, "11111111", "10");
-            await client.LaunchBuild(project, builder, branch, "99999999", "90");
-            await client.LaunchBuild(project, builder, branch, "44444444", "40");
+            await client.LaunchBuild(project, builder, branch, "32e0dff84ceb", "10");
+            await client.LaunchBuild(project, builder, branch, "9683b9f88e0e", "90");
+            await client.LaunchBuild(project, builder, branch, "43294e7c9854", "40");
             Trace.WriteLine("Three setup builds are launched");
 
             bool isAllRunning = false;
@@ -64,25 +68,27 @@ namespace Unity.Katana.IntegrationTests.Tests
                     Assert.True(false, "Testcase failed after running for 5 minutes");
 
                 //// Stop the setup builds if they are running ////
-                build1 = client.GetBuildNumberFromRevision("10000001", builder);
-                build2 = client.GetBuildNumberFromRevision("10000002", builder);
+                build1 = client.GetBuildNumberFromRevision("24c95392f5c2", builder);
+                build2 = client.GetBuildNumberFromRevision("8d4e8eefeb52", builder);
                 if (build1 >= 0)
                 {
                     await client.StopBuild(project, builder, build1.ToString(), branch);
+                    Trace.WriteLine($"Stopping build {build1}");
                 }
                 if (build2 >= 0)
                 {
                     await client.StopBuild(project, builder, build2.ToString(), branch);
+                    Trace.WriteLine($"Stopping build {build2}");
                 }
                 
 
                 //// Read the build number ////
-                build1 = client.GetBuildNumberFromRevision("11111111", builder);
-                build2 = client.GetBuildNumberFromRevision("99999999", builder);
-                build3 = client.GetBuildNumberFromRevision("44444444", builder);
+                build1 = client.GetBuildNumberFromRevision("32e0dff84ceb", builder);
+                build2 = client.GetBuildNumberFromRevision("9683b9f88e0e", builder);
+                build3 = client.GetBuildNumberFromRevision("43294e7c9854", builder);
 
                 isAllRunning = (build1 >= 0) && (build2 >= 0) && (build3 >= 0);
-
+                Trace.WriteLine($"builds number : {build1}, {build2}, {build3}");
                 if (!isAllRunning)
                     Trace.WriteLine($"not all the builds are running, {build1}, {build2} {build3}, " +
                         $"refresh after 5 seconds");
@@ -92,7 +98,7 @@ namespace Unity.Katana.IntegrationTests.Tests
 
             #region clean up and assertion            
             WriteTraceToFile(myTextListener);
-
+            await client.StopAllBuildOnBuilder(project, builder, branch);
             (build1 > build3 && build3 > build2).Should().BeTrue("The build number should be ordered " +
                 "accodring to their priority");
 #endregion
@@ -118,6 +124,7 @@ namespace Unity.Katana.IntegrationTests.Tests
             var project = setup["project"].ToString();
             var builder = setup["builder"].ToString();
             var branch = setup["branch"].ToString();
+            var revision_short = setup["revision"].ToString();
             #endregion
             #region action
             //// Step : Get the list of available 'build slaves' ////
@@ -183,15 +190,34 @@ namespace Unity.Katana.IntegrationTests.Tests
             }
                         
             //// Step : Launch 3 builds on the first build slave ////
-            List<string> revisions = new List<string>() { "222564a95d9a" };
+            List<string> revisions = new List<string>() { revision_short };
             for (int i = 0; i < 3; i++)
             {
                 await client.LaunchBuild(project, builder, branch, revisions[0], "90", freeSlaves.First());
                 Trace.WriteLine($"A build on builder {builder} of project {project} - branch {branch} is launched");
             }
-                
-            //// Step : Wait all the builds are running ,and read their build number ////
-            List<int> builds = WaitAllBuildsAreRunning(revisions, client, builder);
+            Thread.Sleep(3000);
+
+            //// Stop: The builds take long time to build, stop them. ////
+            bool isPengingBuild = true;
+            while (isPengingBuild)
+            {
+                StopCurrentBuildsIfPending(client, project, builder, branch);
+                var response = client.GetPendingBuilds(builder);
+                JArray contents = JArray.Parse(response.Result.Content.ReadAsStringAsync().Result);
+                if (contents.Count < 1)
+                {
+                    isPengingBuild = false;
+                }
+            }
+
+            var _build = client.GetBuildNumberFromRevision(revision_short, builder, 1);
+            await client.StopBuild(project, builder, _build.ToString(), branch);
+
+
+            //// Step : Wait all the builds are running ,and read their build number ////            
+            List<int> builds = client.GetXBuildNumberFromRevision(revision_short, builder, 3);
+
             foreach (var item in builds)
             {
                 Trace.WriteLine($"A build is/was running with builder number {item}");
@@ -218,50 +244,40 @@ namespace Unity.Katana.IntegrationTests.Tests
                                 
             }
 
-            //// Step: Read the information of the selected build slave, Check all 3 builds are there////
-            resp = await client.GetLastXBuildsOnSlave(freeSlaves.First(), 3);
-            var contentArray = JArray.Parse(resp.Content.ReadAsStringAsync().Result);
-            contentArray.Count.Invoking(t => t.Should().Be(3, "only 3 builds should be fetched"))
-                .IgnoreAnyExceptions<Xunit.Sdk.XunitException>()
-                .AddResult(errmsgs);
+            ////// Step: Read the information of the selected build slave, Check all 3 builds are there////
+            //resp = await client.GetLastXBuildsOnSlave(freeSlaves.First(), 3);
+            //var contentArray = JArray.Parse(resp.Content.ReadAsStringAsync().Result);
+            //contentArray.Count.Invoking(t => t.Should().Be(3, "only 3 builds should be fetched"))
+            //    .IgnoreAnyExceptions<Xunit.Sdk.XunitException>()
+            //    .AddResult(errmsgs);
 
-            foreach (JObject item in contentArray)
-            {
-                var _rev = item["sourceStamps"][0]["revision_short"].ToString();
-                var _num = (int)item["number"];
-                Trace.WriteLine($"Build #{_num} used revision {_rev}");
-                ///// Step : Check the last 3 builds on that slave used the revision provide early in the testcase. ////
-                bool _isContained = revisions.Contains(_rev);
-                _isContained.Invoking(t => t.Should()
-                    .BeTrue($"build with rev:{_rev} should be built by slave {freeSlaves.First()}"))
-                    .IgnoreAnyExceptions<Xunit.Sdk.XunitException>()
-                    .AddResult(errmsgs);
+            //foreach (JObject item in contentArray)
+            //{
+            //    var _rev = item["sourceStamps"][0]["revision_short"].ToString();
+            //    var _num = (int)item["number"];
+            //    Trace.WriteLine($"Build #{_num} used revision {_rev}");
+            //    ///// Step : Check the last 3 builds on that slave used the revision provide early in the testcase. ////
+            //    bool _isContained = revisions.Contains(_rev);
+            //    _isContained.Invoking(t => t.Should()
+            //        .BeTrue($"build with rev:{_rev} should be built by slave {freeSlaves.First()}"))
+            //        .IgnoreAnyExceptions<Xunit.Sdk.XunitException>()
+            //        .AddResult(errmsgs);
 
-                ///// Step : Check the last 3 builds on that slave contains 
-                ////         the build number we get in early in the testcase. ////
-                _isContained = builds.Contains(_num);
-                _isContained.Invoking(t => t.Should()
-                    .BeTrue($"build #{_num} should be built by this slave {freeSlaves.First()}"))
-                    .IgnoreAnyExceptions<Xunit.Sdk.XunitException>()
-                    .AddResult(errmsgs);
+            //    ///// Step : Check the last 3 builds on that slave contains 
+            //    ////         the build number we get in early in the testcase. ////
+            //    _isContained = builds.Contains(_num);
+            //    _isContained.Invoking(t => t.Should()
+            //        .BeTrue($"build #{_num} should be built by this slave {freeSlaves.First()}"))
+            //        .IgnoreAnyExceptions<Xunit.Sdk.XunitException>()
+            //        .AddResult(errmsgs);                
+            //}
 
-                if (_isContained)
-                {
-                    builds.Remove(_num);
-                }
-            }
-
-            builds.Count.Invoking(t => t.Should().Be(0, "3 predefined revision number should be removed in last step"))
-                    .IgnoreAnyExceptions<Xunit.Sdk.XunitException>()
-                    .AddResult(errmsgs);
-
-           
+            await client.StopAllBuildOnBuilder(project, builder, branch);
             WriteTraceToFile(myTextListener);
             AssertTestcase(errmsgs);
             #endregion
         }
-
-
+        
         private void CreateBaseConfigFile(string config)
         {
             var assembly = GetType().GetTypeInfo().Assembly;

@@ -6,6 +6,8 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using Unity.Katana.IntegrationTests.Client;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace Unity.Katana.IntegrationTests.Tests
@@ -55,6 +57,9 @@ namespace Unity.Katana.IntegrationTests.Tests
                 if (counter > 60)
                     new TimeoutException("Testcase failed after running for 5 minutes");
 
+
+                WaitPendingBuildRequestListEmpty(client, builder, 5, revision);
+
                 //// Read the build number ////                
                 if (revision.Count > 1)
                 {
@@ -67,14 +72,76 @@ namespace Unity.Katana.IntegrationTests.Tests
                 {                    
                     builds = client.GetXBuildNumberFromRevision(revision[0], builder, X, num);
                 }
-                
-                isAllRunning = builds.All(x => x >= 0);
+                                
                 if (!isAllRunning)
                 {
                     Thread.Sleep(5000);
                 }                
             }
             return builds;
+        }
+
+
+        /// <summary>
+        /// Wait the pending build request list is empty, or there is not revision under test in the list.
+        /// </summary>
+        /// <param name="client"></param>
+        /// <param name="builder"></param>
+        /// <param name="t">timeout in minute</param>
+        /// <param name="revisions"></param>
+        public void WaitPendingBuildRequestListEmpty(KatanaClient client, 
+                                                     string builder, 
+                                                     int t = 5, 
+                                                     List<string> revisions = null)
+        {
+            int cnt = 0;
+            var response = client.GetPendingBuilds(builder);
+            JArray contents = JArray.Parse(response.Result.Content.ReadAsStringAsync().Result);
+            
+            while (contents.Count > 0)
+            {
+                if (revisions.Count > 0)
+                {
+                    bool matchfound = false;
+                    foreach (var content in contents)
+                    {
+                        var build_revision = content["source"]["revision_short"].ToString();
+                        if (revisions.Contains(build_revision))
+                        {
+                            matchfound = true;
+                        }                        
+                    }
+
+                    if (!matchfound)
+                    {
+                        break;
+                    }
+                }
+
+                cnt++;
+                Thread.Sleep(5000);
+                if (cnt > t * 12)
+                {
+                    break;
+                }
+                
+            }
+        }
+
+        public void StopCurrentBuildsIfPending(KatanaClient client, string project, string builder, string branch)
+        {
+            var response = client.GetPendingBuilds(builder);
+            string response_string = response.Result.Content.ReadAsStringAsync().Result;
+            JArray contents = JArray.Parse(response_string);
+            if (contents.Count > 0) {
+                response = client.GetABuilderInfo(builder);
+                var resp = JObject.Parse(response.Result.Content.ReadAsStringAsync().Result);
+                foreach (var build in resp["currentBuilds"])
+                {
+                    string _nr = build["number"].ToString();
+                    client.StopBuild(project, builder, _nr, branch);
+                }                
+            }
         }
 
         /// <summary>

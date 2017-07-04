@@ -1,18 +1,19 @@
 {
+  //"BaseAddress": "https://staging-katana-02-dub.bf.unity3d.com",
   "BaseAddress": "https://staging-katana.bf.unity3d.com",
   "TestSetup": [
     {
       "name": "default",
       "project": "Unity",
-      "builder": "proj0-zUWPTests",
+      "builder": "proj0-Test DeploymentTests - Services - Tizen",
       "branch": "trunk"
     },
     {
       "name": "UseSpecifiedSlaveTest",
-      "project": "Brotli",
-      "builder": "proj32-Build Brotli [linux]",
-      "branch": "master"
+      "project": "FMOD",
+      "builder": "proj2-Android",
+      "branch": "trunk",
+      "revision": "85c3c6e06468"
     }
-
   ]
 }

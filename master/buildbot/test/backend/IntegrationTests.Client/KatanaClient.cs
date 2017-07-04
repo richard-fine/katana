@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -16,6 +17,7 @@ namespace Unity.Katana.IntegrationTests.Client
     {
         private static readonly HttpClient client;
         private static HttpClientHandler handler;
+        private static StreamWriter sw;
         //private JObject settings = JObject.Parse("katana.settings.json");
 
         public string url { get; set; }
@@ -23,7 +25,12 @@ namespace Unity.Katana.IntegrationTests.Client
         static KatanaClient()
         {
             handler = new HttpClientHandler();            
-            client = new HttpClient(handler);
+            client = new HttpClient(handler);                        
+            sw = new StreamWriter(
+                    File.Create(
+                    $"katanaclientlog-{DateTime.UtcNow.ToUniversalTime().ToString("ddMMyyyyHHmmss")}.log")
+                    );
+
         }
                             
         public void SetBaseAddress(string url)
@@ -215,7 +222,7 @@ namespace Unity.Katana.IntegrationTests.Client
         public async Task<HttpResponseMessage> GetPendingBuilds(string builder)
         {
             SetContentType(ContentType.Json);
-            var url = $"/json/pending/%s/";
+            var url = $"/json/pending/{builder}/";
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -254,12 +261,21 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             int buildnr = -1;
             var resp = GetLastXBuilds(builder, num);
-            var content = JObject.Parse(resp.Result.Content.ReadAsStringAsync().Result);            
+            var content = JObject.Parse(resp.Result.Content.ReadAsStringAsync().Result);
+            sw.WriteLine($"Get {num} builds with revision {revision}. content :  {content.ToString()}");
             for (int i = 1; i <= num; i++)
             {
                 string iStr = (i * -1).ToString();
-                string rev = content[iStr]["sourceStamps"][0]["revision_short"].ToString();
-                
+                string rev = string.Empty;
+                try
+                {
+                    rev = content[iStr]["sourceStamps"][0]["revision_short"].ToString();
+                }
+                catch (Exception)
+                {
+                    sw.WriteLine($"Revision nunmber {revision} is not found in {i} : content is {content[iStr]}");                    
+                }
+                                
                 if (rev == revision)
                 {                 
                     buildnr = (int)content[iStr]["number"];
@@ -284,12 +300,22 @@ namespace Unity.Katana.IntegrationTests.Client
             //List<int> buildsnr = Enumerable.Repeat(-1, X - 1).ToList();
             var resp = GetLastXBuilds(builder, num);
             var content = JObject.Parse(resp.Result.Content.ReadAsStringAsync().Result);
+            sw.WriteLine($"Get {num} build with revision {revision}. content :  {content.ToString()}");
             //// Loop 'num' times, to find the build which has a match of revision number,  ////
             //// and add the build number into list ////
             for (int i = 1; i <= num; i++)
             {
                 string iStr = (i * -1).ToString();
-                string rev = content[iStr]["sourceStamps"][0]["revision_short"].ToString();
+                string rev = string.Empty;
+                try
+                {
+                    rev = content[iStr]["sourceStamps"][0]["revision_short"].ToString();
+                }
+                catch (Exception)
+                {
+                    sw.WriteLine($"Revision nunmber {revision} is not found in {i} : content is {content[iStr]}");                    
+                }
+                    
 
                 if (rev == revision)
                 {                    
@@ -325,13 +351,18 @@ namespace Unity.Katana.IntegrationTests.Client
                                                    string slave = null,
                                                    bool force = true)
         {
-            string action = $"/projects/{project}/builders/{builder}/force?{project.ToLower()}_branch={branch}" +
-                                $"&returnpage=pending_json";
+            string action = $"/projects/{project}/builders/{builder}/force?{project.ToLower()}_branch={branch}" +  $"&returnpage=pending_json";
 
             var slctslave = slave == null ? "default" : slave;
             List<string> payload = new List<string>();
-            //payload.Add($"forcescheduler={project.ToLower()}BuildersWithSmartSelect [force]");
-            payload.Add($"forcescheduler={project.ToLower()}+%5Bforce%5D");
+            if (project == "Unity")
+            {
+                payload.Add($"forcescheduler={project.ToLower()}BuildersWithSmartSelect [force]");
+            }
+            else
+            {
+                payload.Add($"forcescheduler={project.ToLower()}+%5Bforce%5D");
+            }            
             payload.Add($"selected_slave={slctslave}");
             payload.Add($"priority={priority}");
             payload.Add("reason=IntegrationTest");
@@ -346,9 +377,28 @@ namespace Unity.Katana.IntegrationTests.Client
             return response;
         }
 
+        public async Task<HttpResponseMessage> StopAllBuildOnBuilder(string project, string builder, string branch)
+        {
+            HttpResponseMessage response = await GetABuilderInfo(builder);
+            HttpResponseMessage resp = null;
+            var content = JObject.Parse(response.Content.ReadAsStringAsync().Result);
+            sw.WriteLine($"Read builder {builder} on {project}/{branch} : {content}");
+            JArray currentBuilds = (JArray)content["currentBuilds"];
+            if (currentBuilds != null)
+            {
+                foreach (var currentBuild in currentBuilds)
+                {
+                    string build = currentBuild["number"].ToString();
+                    resp = await StopBuild(project, builder, build, branch);
+                }                
+            }
+            return resp;
+        }
+
+
         public async Task<HttpResponseMessage> StopBuild(string project, string builder, string build, string branch)
         {
-            string action = $"/projects/{project}/builders/{builder}/builds/{build}/stopchain?" +
+            string action = $"/projects/{project}/builders/{builder}/builds/{build}/stop?" +
                 $"{project.ToLower()}_branch={branch}";
             string content = "comments=Backend Integration Test";
             HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
@@ -367,7 +417,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             string action = $"/projects/{project}/builders/{builder}/builds/{build}/stopchain?" +
                 $"{project.ToLower()}_branch={branch}";
-            string content = "comments=Backend Integration Test";
+            string content = "comments=Backend Integration Test";            
             HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
             return response;
         }
