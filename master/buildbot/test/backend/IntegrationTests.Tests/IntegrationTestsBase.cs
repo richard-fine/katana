@@ -3,8 +3,12 @@ using System.Diagnostics;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Text;
+using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using Unity.Katana.IntegrationTests.Client;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -16,6 +20,11 @@ namespace Unity.Katana.IntegrationTests.Tests
     {
         protected string settingfile = "test.json";
 
+        /// <summary>
+        /// Setup the trace file for each testcase.
+        /// </summary>
+        /// <param name="filename"></param>
+        /// <returns></returns>
         protected TextWriterTraceListener SetupTraceFile(string filename)
         {
             TextWriterTraceListener myTextListener = null;
@@ -27,6 +36,10 @@ namespace Unity.Katana.IntegrationTests.Tests
             return myTextListener;
         }
 
+        /// <summary>
+        /// Flush the trace to the file.
+        /// </summary>
+        /// <param name="myTextListener"></param>
         protected void WriteTraceToFile(TextWriterTraceListener myTextListener)
         {
             myTextListener.Flush();
@@ -34,7 +47,18 @@ namespace Unity.Katana.IntegrationTests.Tests
             myTextListener.Dispose();
         }
 
-
+        /// <summary>
+        /// After launch some builds, give a list of strings which are revisions of the builds. 
+        /// Check if all the builds are up and running, and return the build number
+        /// </summary>
+        /// <param name="revision"></param>
+        /// <param name="client"></param>
+        /// <param name="builder"></param>
+        /// <param name="method"></param>
+        /// <param name="X"></param>
+        /// <param name="num"></param>
+        /// <returns>The build number</returns>
+        /// <remarks> this method is not well tested.</remarks>
         protected List<int> WaitAllBuildsAreRunning(List<string> revision,
                                            KatanaClient client,
                                            string builder,
@@ -128,7 +152,51 @@ namespace Unity.Katana.IntegrationTests.Tests
             }
         }
 
-        public void StopCurrentBuildsIfPending(KatanaClient client, string project, string builder, string branch)
+        public async Task FreeAllSlavesOfABuilder(KatanaClient client,  string builder)
+        {
+            // Get the slaves of a builder
+            // check the state of each slave
+            // if the slave is not free, stop the build on it
+            Task<HttpResponseMessage> resp = client.GetSlavesOfBuilder(builder);
+            var slavearray = ParseJObjectResponse(resp.Result);
+            await StopRunningBuildsOnAllSlave(client, slavearray);
+            resp = client.GetStartSlavesOfBuilder(builder);
+            slavearray = ParseJObjectResponse(resp.Result);
+            await StopRunningBuildsOnAllSlave(client, slavearray);
+            // risk: maybe there are multiple build on a slave, need check how to do that.
+        }
+
+        protected async Task StopRunningBuildsOnAllSlave(KatanaClient client, JObject slavearray)
+        {
+            foreach (var kvp in slavearray)
+            {
+                JObject slave = (JObject)kvp.Value;
+                JArray runningBuilds = (JArray)slave["runningBuilds"];
+                if (runningBuilds != null)
+                {
+                    if (runningBuilds.Count() > 0)
+                    {
+                        foreach (var build in runningBuilds)
+                        {
+                            string buildurl = build["builder_url"].ToString();
+                            string buildnr = build["number"].ToString();
+                            buildurl.Replace("?", $"/builds/{buildnr}/stop?");
+                            await client.StopBuild(buildurl);
+                        }
+                    }
+                }
+            }
+        }
+
+ 
+        /// <summary>
+        /// Check the pending build request list, If there is a pending builds, stop the running build on the builder.
+        /// </summary>
+        /// <param name="client"></param>
+        /// <param name="project"></param>
+        /// <param name="builder"></param>
+        /// <param name="branch"></param>
+        public async Task StopCurrentBuildsIfPending(KatanaClient client, string project, string builder, string branch)
         {
             var response = client.GetPendingBuilds(builder);
             string response_string = response.Result.Content.ReadAsStringAsync().Result;
@@ -139,9 +207,46 @@ namespace Unity.Katana.IntegrationTests.Tests
                 foreach (var build in resp["currentBuilds"])
                 {
                     string _nr = build["number"].ToString();
-                    client.StopBuild(project, builder, _nr, branch);
+                    await client.StopBuild(project, builder, _nr, branch);
                 }                
             }
+        }
+
+        /// <summary>
+        /// Get the current testcase name. 
+        /// </summary>
+        /// <param name="memberName"></param>
+        /// <returns></returns>
+        /// <see cref="https://stackoverflow.com/questions/41112381/get-the-name-of-the-currently-executing-method-in-dotnet-core"/>
+        public string GetTestcaseName([System.Runtime.CompilerServices.CallerMemberName] string memberName = "")
+        {            
+            return memberName;
+        }
+
+        /// <summary>
+        /// The next three methods are parse the response data to the corresponding JSON format. 
+        /// </summary>
+        /// <param name="resp"></param>
+        /// <returns></returns>
+        public JArray ParseJArrayResponse(HttpResponseMessage resp)
+        {
+            var content = resp.Content.ReadAsStringAsync().Result;
+            JArray result = JArray.Parse(content);
+            return result;
+        }
+
+        public JObject ParseJObjectResponse(HttpResponseMessage resp)
+        {
+            var content = resp.Content.ReadAsStringAsync().Result;
+            JObject result = JObject.Parse(content);
+            return result;
+        }
+
+        public JToken ParseJContainerResponse(HttpResponseMessage resp)
+        {
+            var content = resp.Content.ReadAsStringAsync().Result;
+            JToken result = JContainer.Parse(content);
+            return result;
         }
 
         /// <summary>

@@ -1,15 +1,27 @@
 {
-  //"BaseAddress": "https://staging-katana-02-dub.bf.unity3d.com",
-  "BaseAddress": "https://staging-katana.bf.unity3d.com",
+  "BaseAddress": "https://staging-katana-02-dub.bf.unity3d.com",
+  //"BaseAddress": "https://staging-katana.bf.unity3d.com",
   "TestSetup": [
     {
-      "name": "default",
-      "project": "Unity",
-      "builder": "proj0-Test DeploymentTests - Services - Tizen",
-      "branch": "trunk"
+      "name": "TriggerBuildTest",
+      //"project": "Unity",
+      //"builder": "proj0-Test DeploymentTests - Services - Tizen",
+      //"branch": "trunk"
+      "project": "FMOD",
+      "builder": "proj2-Linux 32%2F64",
+      "branch": "trunk",
+      "revision": "bf98c4809fcc"
     },
     {
       "name": "UseSpecifiedSlaveTest",
+      "project": "FMOD",
+      "builder": "proj2-Android",
+      "branch": "trunk",
+      "revision": "85c3c6e06468"
+    },
+
+    {
+      "name": "RebuildTest",
       "project": "FMOD",
       "builder": "proj2-Android",
       "branch": "trunk",

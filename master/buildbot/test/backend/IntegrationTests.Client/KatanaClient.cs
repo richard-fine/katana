@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net;
+using System.Threading;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
@@ -75,7 +76,7 @@ namespace Unity.Katana.IntegrationTests.Client
         public async Task<HttpResponseMessage> GetAllBuildsOfABuilder(string builder)
         {
             SetContentType(ContentType.Json);
-            var url = $"/json/builders/{builder}/builds/all";
+            var url = $"/json/builders/{builder}/builds/_all";
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -285,6 +286,73 @@ namespace Unity.Katana.IntegrationTests.Client
             return buildnr;
         }
 
+
+        /// <summary>
+        /// Find the build number from revision number and start and stop time
+        /// Make sure only the recently start or stopped build are found
+        /// </summary>
+        /// <param name="revision"></param>
+        /// <param name="builder"></param>
+        /// <param name="typeoftime">0: build start time,  1: build finish time</param>
+        /// <param name="interval">the offset of current time and selected timestamp</param>
+        /// <param name="num">how many builds are searched</param>
+        /// <returns></returns>
+        public int GetBuildNumberFromRevisionAndTime(string revision,
+                                                     string builder,
+                                                     int typeoftime = 0,
+                                                     int interval = 20, 
+                                                     int num = 3)
+        {
+            int buildnr = -1;
+            var resp = GetLastXBuilds(builder, num);
+            var content = JObject.Parse(resp.Result.Content.ReadAsStringAsync().Result);
+            int time = 0;
+            sw.WriteLine($"Get {num} builds with revision {revision}. content :  {content.ToString()}");
+            for (int i = 1; i <= num; i++)
+            {
+                string iStr = (i * -1).ToString();
+                string rev = string.Empty;
+                try
+                {
+                    rev = content[iStr]["sourceStamps"][0]["revision_short"].ToString();
+                }
+                catch (Exception)
+                {
+                    sw.WriteLine($"Revision nunmber {revision} is not found in {i} : content is {content[iStr]}");
+                }
+
+                try
+                {
+                    double _time = 0;
+                    if (typeoftime == 0)
+                    {
+                        _time = (double)content[iStr]["times"][0];
+                    }
+                    else if (typeoftime == 1)
+                    {
+                        _time = (double)content[iStr]["times"][1];
+                    }                     
+                    var _seconds = Math.Truncate(_time);
+                    time = (int)_seconds;
+                }
+                catch (Exception)
+                {
+                    sw.WriteLine($"Finish time {time} is not found in {i} : content is {content[iStr]}");
+                }
+
+                var datanow = (DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0)).TotalSeconds;
+
+                var diff = datanow - time;  
+
+                if (rev == revision && diff <= interval)
+                {
+                    buildnr = (int)content[iStr]["number"];
+                    break;
+                }
+            }
+            return buildnr;
+        }
+
         /// <summary>
         /// Give a revision, retrun X number of 'build number' on that builder. 
         /// </summary>
@@ -318,7 +386,7 @@ namespace Unity.Katana.IntegrationTests.Client
                     
 
                 if (rev == revision)
-                {                    
+                {
                     buildsnr.Add((int)content[iStr]["number"]);
                     if (buildsnr.Count >= X)
                     {
@@ -349,6 +417,7 @@ namespace Unity.Katana.IntegrationTests.Client
                                                    string revision,
                                                    string priority,
                                                    string slave = null,
+                                                   string reason = "IntegrationTest",
                                                    bool force = true)
         {
             string action = $"/projects/{project}/builders/{builder}/force?{project.ToLower()}_branch={branch}" +  $"&returnpage=pending_json";
@@ -365,7 +434,7 @@ namespace Unity.Katana.IntegrationTests.Client
             }            
             payload.Add($"selected_slave={slctslave}");
             payload.Add($"priority={priority}");
-            payload.Add("reason=IntegrationTest");
+            payload.Add($"reason={reason}");
             payload.Add($"{project.ToLower()}_revision={revision}");
             if (force)
             {
@@ -373,6 +442,19 @@ namespace Unity.Katana.IntegrationTests.Client
             }
             
             string content = string.Join("&", payload);
+            HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
+            return response;
+        }
+
+        public async Task<HttpResponseMessage> Rebuild(string project, 
+                                                       string builder, 
+                                                       string branch, 
+                                                       string build, 
+                                                       string reason= "Backend Integration Test")
+        {
+            string action = $"/projects/{project}/builders/{builder}/builds/{build}/rebuild?" +
+                $"{project.ToLower()}_branch={branch}&property1name=force_rebuild&property1value=True";
+            string content = $"comments={reason}";
             HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
             return response;
         }
@@ -390,6 +472,7 @@ namespace Unity.Katana.IntegrationTests.Client
                 {
                     string build = currentBuild["number"].ToString();
                     resp = await StopBuild(project, builder, build, branch);
+                    await Task.Delay(1000);
                 }                
             }
             return resp;
@@ -402,6 +485,7 @@ namespace Unity.Katana.IntegrationTests.Client
                 $"{project.ToLower()}_branch={branch}";
             string content = "comments=Backend Integration Test";
             HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
+            await Task.Delay(1000);
             return response;
         }
 
@@ -409,6 +493,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {            
             string content = "comments=Backend Integration Test";
             HttpResponseMessage response = await SendPostRequest(url, content, ContentType.wwwForm);
+            await Task.Delay(1000);
             return response;
         }
 
@@ -419,6 +504,7 @@ namespace Unity.Katana.IntegrationTests.Client
                 $"{project.ToLower()}_branch={branch}";
             string content = "comments=Backend Integration Test";            
             HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
+            await Task.Delay(1000);
             return response;
         }
 
