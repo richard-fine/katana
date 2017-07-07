@@ -25,7 +25,7 @@ def restart(config):
 
     try:
         stop.stopSlave(basedir, quiet)
-    except stop.SlaveNotRunning:
+    except stop.ServiceNotRunning:
         if not quiet:
             print "no old buildslave process found to stop"
     if not quiet:

@@ -1,18 +1,3 @@
-# This file is part of Buildbot.  Buildbot is free software: you can
-# redistribute it and/or modify it under the terms of the GNU General Public
-# License as published by the Free Software Foundation, version 2.
-#
-# This program is distributed in the hope that it will be useful, but WITHOUT
-# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
-# details.
-#
-# You should have received a copy of the GNU General Public License along with
-# this program; if not, write to the Free Software Foundation, Inc., 51
-# Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-#
-# Copyright Buildbot Team Members
-
 import os.path
 import socket
 import sys
@@ -25,9 +10,8 @@ from twisted.application import service, internet
 from twisted.cred import credentials
 
 import buildslave
-from buildslave.pbutil import ReconnectingPBClientFactory
+from pbutil import ReconnectingPBClientFactory
 from buildslave.commands import registry, base
-from buildslave import monkeypatches
 
 class UnknownCommand(pb.Error):
     pass
@@ -330,7 +314,7 @@ class Bot(pb.Referenceable, service.MultiService):
         return buildslave.version
 
     def remote_shutdown(self):
-        log.msg("slave shutting down on command from master")
+        log.msg("service shutting down on command from master")
         # there's no good way to learn that the PB response has been delivered,
         # so we'll just wait a bit, in hopes the master hears back.  Masters are
         # resilinet to slaves dropping their connections, so there is no harm
@@ -347,7 +331,7 @@ class BotFactory(ReconnectingPBClientFactory):
     # of such (although this could take several minutes).
     keepaliveInterval = None # None = do not use keepalives
 
-    # 'maxDelay' determines the maximum amount of time the slave will wait
+    # 'maxDelay' determines the maximum amount of time the service will wait
     # between connection retries
     maxDelay = 300
 
@@ -373,7 +357,7 @@ class BotFactory(ReconnectingPBClientFactory):
         self.connector = connector
 
     def gotPerspective(self, perspective):
-        log.msg("Connected to %s:%s; slave is ready" % (self.buildmaster_host, self.port))
+        log.msg("Connected to %s:%s; the service is ready" % (self.buildmaster_host, self.port))
         ReconnectingPBClientFactory.gotPerspective(self, perspective)
         self.perspective = perspective
         try:
@@ -428,7 +412,7 @@ class BotFactory(ReconnectingPBClientFactory):
 
     def activity(self, res=None):
         """Subclass or monkey-patch this method to be alerted whenever there is
-        active communication between the master and slave."""
+        active communication between the master and the service."""
         pass
 
     def stopFactory(self):
@@ -436,8 +420,8 @@ class BotFactory(ReconnectingPBClientFactory):
         self.stopTimers()
 
 
-class BuildSlave(service.MultiService):
-    def __init__(self, buildmaster_host, port, name, passwd, basedir,
+class BuildRequestDistributor(service.MultiService):
+    def __init__(self, buildmaster_host, port, name, password, basedir,
                  keepalive, usePTY, keepaliveTimeout=None, umask=None,
                  maxdelay=300, unicode_encoding=None, allow_shutdown=None):
 
@@ -464,15 +448,13 @@ class BuildSlave(service.MultiService):
 
         self.allow_shutdown = allow_shutdown
         bf = self.bf = BotFactory(buildmaster_host, port, keepalive, maxdelay)
-        bf.startLogin(credentials.UsernamePassword(name, passwd), client=bot)
+        bf.startLogin(credentials.UsernamePassword(name, password), client=bot)
         self.connection = c = internet.TCPClient(buildmaster_host, port, bf)
         c.setServiceParent(self)
 
     def startService(self):
-        # first, apply all monkeypatches
-        monkeypatches.patch_all()
 
-        log.msg("Starting BuildSlave -- version: %s" % buildslave.version)
+        log.msg("Starting BuildRequestDistributor")
 
         self.recordHostname(self.basedir)
         if self.umask is not None:
@@ -540,9 +522,10 @@ class BuildSlave(service.MultiService):
 
         log.msg("Telling the master we want to shutdown after any running builds are finished")
         d = self.bf.perspective.callRemote("shutdown")
+
         def _shutdownfailed(err):
             if err.check(AttributeError):
-                log.msg("Master does not support slave initiated shutdown.  Upgrade master to 0.8.3 or later to use this feature.")
+                log.msg("Master does not support service initiated shutdown.  Upgrade master to 0.8.3 or later to use this feature.")
             else:
                 log.msg('callRemote("shutdown") failed')
                 log.err(err)

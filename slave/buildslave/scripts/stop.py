@@ -19,7 +19,7 @@ from buildslave.scripts import base
 from twisted.python.runtime import platformType
 
 
-class SlaveNotRunning(Exception):
+class ServiceNotRunning(Exception):
     """
     raised when trying to stop slave process that is not running
     """
@@ -36,7 +36,7 @@ def stopSlave(basedir, quiet, signame="TERM"):
     @param   quite: if False, don't print any messages to stdout
     @param signame: signal to send to the slave process
 
-    @raise SlaveNotRunning: if slave pid file is not found
+    @raise ServiceNotRunning: if slave pid file is not found
     """
     import signal
 
@@ -45,7 +45,7 @@ def stopSlave(basedir, quiet, signame="TERM"):
         with open(pidfile, "rt") as f:
             pid = int(f.read().strip())
     except:
-        raise SlaveNotRunning()
+        raise ServiceNotRunning()
 
     signum = getattr(signal, "SIG" + signame)
     timer = 0
@@ -83,7 +83,7 @@ def stop(config, signame="TERM"):
 
     try:
         stopSlave(basedir, quiet, signame)
-    except SlaveNotRunning:
+    except ServiceNotRunning:
         if not quiet:
             print "buildslave not running"
 

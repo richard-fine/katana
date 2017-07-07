@@ -1,42 +1,27 @@
-# This file is part of Buildbot.  Buildbot is free software: you can
-# redistribute it and/or modify it under the terms of the GNU General Public
-# License as published by the Free Software Foundation, version 2.
-#
-# This program is distributed in the hope that it will be useful, but WITHOUT
-# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
-# details.
-#
-# You should have received a copy of the GNU General Public License along with
-# this program; if not, write to the Free Software Foundation, Inc., 51
-# Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-#
-# Copyright Buildbot Team Members
-
 import os
 import time
 import base
 from twisted.python.runtime import platformType
 
 
-class SlaveNotRunning(Exception):
+class ServiceNotRunning(Exception):
     """
-    raised when trying to stop slave process that is not running
+    raised when trying to stop the service process that is not running
     """
 
 
-def stopSlave(basedir, quiet, signame="TERM"):
+def stopService(basedir, quiet, signame="TERM"):
     """
-    Stop slave process by sending it a signal.
+    Stop the service process by sending it a signal.
 
-    Using the specified basedir path, read slave process's pid file and
+    Using the specified basedir path, read the service process's pid file and
     try to terminate that process with specified signal.
 
-    @param basedir: buildslave's basedir path
+    @param basedir: service's basedir path
     @param   quite: if False, don't print any messages to stdout
-    @param signame: signal to send to the slave process
+    @param signame: signal to send to the the service process
 
-    @raise SlaveNotRunning: if slave pid file is not found
+    @raise ServiceNotRunning: if the service pid file is not found
     """
     import signal
 
@@ -45,12 +30,12 @@ def stopSlave(basedir, quiet, signame="TERM"):
         with open(pidfile, "rt") as f:
             pid = int(f.read().strip())
     except:
-        raise SlaveNotRunning()
+        raise ServiceNotRunning()
 
     signum = getattr(signal, "SIG" + signame)
     timer = 0
     try:
-        if base.isBuildSlaveRunning(basedir, quiet):
+        if base.isServiceRunning(basedir, quiet):
             os.kill(pid, signum)
             if platformType == "win32" and os.path.exists(pidfile):
                 os.unlink(pidfile)
@@ -66,7 +51,7 @@ def stopSlave(basedir, quiet, signame="TERM"):
             os.kill(pid, 0)
         except OSError:
             if not quiet:
-                print "buildslave process %d is dead" % pid
+                print "service process %d is dead" % pid
             return
         timer += 1
         time.sleep(1)
@@ -78,13 +63,13 @@ def stop(config, signame="TERM"):
     quiet = config['quiet']
     basedir = config['basedir']
 
-    if not base.isBuildslaveDir(basedir):
+    if not base.isServiceDir(basedir):
         return 1
 
     try:
-        stopSlave(basedir, quiet, signame)
-    except SlaveNotRunning:
+        stopService(basedir, quiet, signame)
+    except ServiceNotRunning:
         if not quiet:
-            print "buildslave not running"
+            print "service not running"
 
     return 0

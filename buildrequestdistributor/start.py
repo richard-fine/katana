@@ -1,26 +1,10 @@
-# This file is part of Buildbot.  Buildbot is free software: you can
-# redistribute it and/or modify it under the terms of the GNU General Public
-# License as published by the Free Software Foundation, version 2.
-#
-# This program is distributed in the hope that it will be useful, but WITHOUT
-# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
-# details.
-#
-# You should have received a copy of the GNU General Public License along with
-# this program; if not, write to the Free Software Foundation, Inc., 51
-# Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-#
-# Copyright Buildbot Team Members
-
-
 import os, sys, time
 import base
 
 class Follower:
     def follow(self):
         from twisted.internet import reactor
-        from buildslave.scripts.logwatcher import LogWatcher
+        from logwatcher import LogWatcher
         self.rc = 0
         print "Following twistd.log until startup finished.."
         lw = LogWatcher("twistd.log")
@@ -37,40 +21,40 @@ class Follower:
 
     def _failure(self, why):
         from twisted.internet import reactor
-        from buildslave.scripts.logwatcher import BuildmasterTimeoutError, \
-             ReconfigError, BuildslaveTimeoutError, BuildSlaveDetectedError
+        from logwatcher import BuildmasterTimeoutError, \
+             ReconfigError, ServiceTimeoutError, ServiceDetectedError
         if why.check(BuildmasterTimeoutError):
             print """
-The buildslave took more than 10 seconds to start, so we were unable to
+The Service took more than 10 seconds to start, so we were unable to
 confirm that it started correctly. Please 'tail twistd.log' and look for a
 line that says 'configuration update complete' to verify correct startup.
 """
-        elif why.check(BuildslaveTimeoutError):
+        elif why.check(ServiceTimeoutError):
             print """
-The buildslave took more than 10 seconds to start and/or connect to the
-buildslave, so we were unable to confirm that it started and connected
+The Service took more than 10 seconds to start and/or connect to the
+Service, so we were unable to confirm that it started and connected
 correctly. Please 'tail twistd.log' and look for a line that says 'message
 from master: attached' to verify correct startup. If you see a bunch of
-messages like 'will retry in 6 seconds', your buildslave might not have the
-correct hostname or portnumber for the buildslave, or the buildslave might
+messages like 'will retry in 6 seconds', your Service might not have the
+correct hostname or portnumber for the Service, or the Service might
 not be running. If you see messages like
    'Failure: twisted.cred.error.UnauthorizedLogin'
-then your buildslave might be using the wrong botname or password. Please
-correct these problems and then restart the buildslave.
+then the service might be using the wrong name or password. Please
+correct these problems and then restart the Service.
 """
         elif why.check(ReconfigError):
             print """
-The buildslave appears to have encountered an error in the master.cfg config
+The service appears to have encountered an error in the config
 file during startup. It is probably running with an empty configuration right
-now. Please inspect and fix master.cfg, then restart the buildslave.
+now. Please inspect and fix buildbot.tac, then restart the service.
 """
-        elif why.check(BuildSlaveDetectedError):
+        elif why.check(ServiceDetectedError):
             print """
-Buildslave is starting up, not following logfile.
+The service is starting up, not following logfile.
 """
         else:
             print """
-Unable to confirm that the buildslave started correctly. You may need to
+Unable to confirm that the service started correctly. You may need to
 stop it, fix the config file, and restart.
 """
             print why
@@ -79,17 +63,17 @@ stop it, fix the config file, and restart.
 
 def startCommand(config):
     basedir = config['basedir']
-    if not base.isBuildslaveDir(basedir):
+    if not base.isServiceDir(basedir):
         return 1
 
-    if base.isBuildSlaveRunning(basedir, config['quiet']):
+    if base.isServiceRunning(basedir, config['quiet']):
         return 1
 
-    return startSlave(basedir, config['quiet'], config['nodaemon'])
+    return startService(basedir, config['quiet'], config['nodaemon'])
 
-def startSlave(basedir, quiet, nodaemon):
+def startService(basedir, quiet, nodaemon):
     """
-    Start slave process.
+    Start the service process.
 
     Fork and start twisted application described in basedir buildbot.tac file.
     Print it's log messages to stdout for a while and try to figure out if
@@ -98,11 +82,11 @@ def startSlave(basedir, quiet, nodaemon):
     If quiet or nodaemon parameters are True, or we are running on a win32
     system, will not fork and log will not be printed to stdout.
 
-    @param  basedir: buildslave's basedir path
+    @param  basedir: service's basedir path
     @param    quiet: don't display startup log messages
     @param nodaemon: don't daemonize (stay in foreground)
-    @return: 0 if slave was successfully started,
-             1 if we are not sure that slave started successfully
+    @return: 0 if the service was successfully started,
+             1 if we are not sure that the service started successfully
     """
 
     os.chdir(basedir)
