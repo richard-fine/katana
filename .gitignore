@@ -47,3 +47,6 @@ www/generated/
 www/coverage/
 autobahnServer.log
 www/prod/css/custom.css
+twistd.hostname
+twistd.log
+twistd.pid
