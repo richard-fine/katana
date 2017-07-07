@@ -321,6 +321,13 @@ class Bot(pb.Referenceable, service.MultiService):
         # if this timeout is too short.
         reactor.callLater(0.2, reactor.stop)
 
+
+class BuildRequestDistributor(pb.Referenceable, service.Service):
+
+    def remote_print(self, message):
+        log.msg("message from master:", message)
+
+
 class ServiceFactory(ReconnectingPBClientFactory):
     # 'keepaliveInterval' serves two purposes. The first is to keep the
     # connection alive: it guarantees that there will be at least some
