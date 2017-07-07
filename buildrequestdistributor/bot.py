@@ -75,8 +75,8 @@ class SlaveBuilder(pb.Referenceable, service.Service):
         if bot:
             bslave = bot.parent
             if bslave:
-                bf = bslave.bf
-                bf.activity()
+                factory = bslave.factory
+                factory.activity()
 
     def remote_setMaster(self, remote):
         self.remote = remote
@@ -321,7 +321,7 @@ class Bot(pb.Referenceable, service.MultiService):
         # if this timeout is too short.
         reactor.callLater(0.2, reactor.stop)
 
-class BotFactory(ReconnectingPBClientFactory):
+class ServiceFactory(ReconnectingPBClientFactory):
     # 'keepaliveInterval' serves two purposes. The first is to keep the
     # connection alive: it guarantees that there will be at least some
     # traffic once every 'keepaliveInterval' seconds, which may help keep an
@@ -420,7 +420,7 @@ class BotFactory(ReconnectingPBClientFactory):
         self.stopTimers()
 
 
-class BuildRequestDistributor(service.MultiService):
+class Service(service.MultiService):
     def __init__(self, buildmaster_host, port, name, password, basedir,
                  keepalive, usePTY, keepaliveTimeout=None, umask=None,
                  maxdelay=300, unicode_encoding=None, allow_shutdown=None):
@@ -447,9 +447,9 @@ class BuildRequestDistributor(service.MultiService):
             self.shutdown_mtime = 0
 
         self.allow_shutdown = allow_shutdown
-        bf = self.bf = BotFactory(buildmaster_host, port, keepalive, maxdelay)
-        bf.startLogin(credentials.UsernamePassword(name, password), client=bot)
-        self.connection = c = internet.TCPClient(buildmaster_host, port, bf)
+        factory = self.factory = ServiceFactory(buildmaster_host, port, keepalive, maxdelay)
+        factory.startLogin(credentials.UsernamePassword(name, password), client=bot)
+        self.connection = c = internet.TCPClient(buildmaster_host, port, factory)
         c.setServiceParent(self)
 
     def startService(self):
@@ -473,8 +473,8 @@ class BuildRequestDistributor(service.MultiService):
             l.start(interval=10)
 
     def stopService(self):
-        self.bf.continueTrying = 0
-        self.bf.stopTrying()
+        self.factory.continueTrying = 0
+        self.factory.stopTrying()
         if self.shutdown_loop:
             self.shutdown_loop.stop()
             self.shutdown_loop = None
@@ -515,13 +515,13 @@ class BuildRequestDistributor(service.MultiService):
 
     def gracefulShutdown(self):
         """Start shutting down"""
-        if not self.bf.perspective:
+        if not self.factory.perspective:
             log.msg("No active connection, shutting down NOW")
             reactor.stop()
             return
 
         log.msg("Telling the master we want to shutdown after any running builds are finished")
-        d = self.bf.perspective.callRemote("shutdown")
+        d = self.factory.perspective.callRemote("shutdown")
 
         def _shutdownfailed(err):
             if err.check(AttributeError):

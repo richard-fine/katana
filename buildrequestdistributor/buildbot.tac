@@ -2,7 +2,7 @@
 import os
 
 from twisted.application import service
-from bot import BuildRequestDistributor
+from bot import Service
 
 basedir = r'.'
 rotateLength = 10000000
@@ -43,7 +43,7 @@ usepty = 0
 umask = None
 maxdelay = 300
 
-s = BuildRequestDistributor(
+s = Service(
     buildmaster_host, port,
     name, password,
     basedir, keepalive,
