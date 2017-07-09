@@ -65,6 +65,11 @@ namespace Unity.Katana.IntegrationTests.Client
             return response;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <returns>JArray</returns>
         public async Task<HttpResponseMessage> GetCachedBuildsOfABuilder(string builder)
         {
             SetContentType(ContentType.Json);
@@ -73,6 +78,11 @@ namespace Unity.Katana.IntegrationTests.Client
             return response;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <returns>JObject with KVP pair</returns>
         public async Task<HttpResponseMessage> GetAllBuildsOfABuilder(string builder)
         {
             SetContentType(ContentType.Json);
@@ -459,7 +469,8 @@ namespace Unity.Katana.IntegrationTests.Client
             return response;
         }
 
-        public async Task<HttpResponseMessage> StopAllBuildOnBuilder(string project, string builder, string branch)
+        public async Task<HttpResponseMessage> StopAllBuildOnBuilder(string project, string builder, string branch,
+                                                                     bool isWaiting = true)
         {
             HttpResponseMessage response = await GetABuilderInfo(builder);
             HttpResponseMessage resp = null;
@@ -471,40 +482,55 @@ namespace Unity.Katana.IntegrationTests.Client
                 foreach (var currentBuild in currentBuilds)
                 {
                     string build = currentBuild["number"].ToString();
-                    resp = await StopBuild(project, builder, build, branch);
-                    await Task.Delay(1000);
+                    resp = await StopBuild(project, builder, build, branch, isWaiting);                    
                 }                
             }
             return resp;
         }
 
 
-        public async Task<HttpResponseMessage> StopBuild(string project, string builder, string build, string branch)
+        public async Task<HttpResponseMessage> StopBuild(string project, string builder, 
+                                                         string build, string branch, bool  isWaiting = true)
         {
             string action = $"/projects/{project}/builders/{builder}/builds/{build}/stop?" +
                 $"{project.ToLower()}_branch={branch}";
-            string content = "comments=Backend Integration Test";
+            string content = "comments=Backend Integration Test force to stop";
             HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
-            await Task.Delay(1000);
+            if (isWaiting)
+            {
+                await Task.Delay(1000);
+            }            
             return response;
         }
 
-        public async Task<HttpResponseMessage> StopBuild(string url)
+        public async Task StopBuildAction(string project, string builder,
+                                                         string build, string branch, bool isWaiting = true)
+        {
+            await StopBuild(project, builder, build, branch, isWaiting);
+        }
+
+        public async Task<HttpResponseMessage> StopBuild(string url, bool isWaiting = true)
         {            
-            string content = "comments=Backend Integration Test";
+            string content = "comments=Backend Integration Test force to stop";
             HttpResponseMessage response = await SendPostRequest(url, content, ContentType.wwwForm);
-            await Task.Delay(1000);
+            if (true)
+            {
+                await Task.Delay(1000);
+            }            
             return response;
         }
 
         public async Task<HttpResponseMessage> StopBuildChain(string project, string builder, 
-                                                                string build, string branch)
+                                                                string build, string branch, bool isWaiting = true)
         {
             string action = $"/projects/{project}/builders/{builder}/builds/{build}/stopchain?" +
                 $"{project.ToLower()}_branch={branch}";
-            string content = "comments=Backend Integration Test";            
+            string content = "comments=Backend Integration Test force to stop the build chain";            
             HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
-            await Task.Delay(1000);
+            if (isWaiting)
+            {
+                await Task.Delay(1000);
+            }            
             return response;
         }
 

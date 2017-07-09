@@ -19,7 +19,7 @@ using FluentAssertions;
 namespace Unity.Katana.IntegrationTests.Tests
 {
     public class TriggerBuildsTest : IntegrationTestsBase
-    {
+    {                        
         /// <summary>
         /// Trigger three builds with different priority
         /// Verify that the execution order follows the priority
@@ -40,20 +40,27 @@ namespace Unity.Katana.IntegrationTests.Tests
             var project = setup["project"].ToString();
             var builder = setup["builder"].ToString();
             var branch = setup["branch"].ToString();
+            JArray revisions = (JArray)setup["revisions"];
+            List<string> revision_list = new List<string>();
+            foreach (var rev in revisions)
+            {
+                revision_list.Add(rev.ToString());
+            }
+            Assert.True(revision_list.Count >= 5, "Test need at least 5 revision string");
             Trace.WriteLine($"Read parameter project : {project}, builder: {builder}, branch: {branch}");
             await FreeAllSlavesOfABuilder(client, builder);
             #endregion
 
             #region action
             //// launch 2 setup builds to make the slave busy  ////
-            await client.LaunchBuild(project, builder, branch, "22490e60db9f", "99");
-            await client.LaunchBuild(project, builder, branch, "a62ae33069cd", "99");
+            await client.LaunchBuild(project, builder, branch, revision_list[0], "99");
+            await client.LaunchBuild(project, builder, branch, revision_list[1], "99");
             Trace.WriteLine("Two setup builds are launched");
             Thread.Sleep(3000);
             //// launch 3 test builds. ////
-            await client.LaunchBuild(project, builder, branch, "bf98c4809fcc", "10");
-            await client.LaunchBuild(project, builder, branch, "a90e5d2c796d", "90");
-            await client.LaunchBuild(project, builder, branch, "8982804a2d35", "40");
+            await client.LaunchBuild(project, builder, branch, revision_list[2], "10");
+            await client.LaunchBuild(project, builder, branch, revision_list[3], "90");
+            await client.LaunchBuild(project, builder, branch, revision_list[4], "40");
             Trace.WriteLine("Three setup builds are launched");
 
             bool isBuild1Stopped = false;
@@ -71,8 +78,8 @@ namespace Unity.Katana.IntegrationTests.Tests
                     Assert.True(false, "Testcase failed after running for 5 minutes");
 
                 //// Stop the setup builds if they are running ////
-                build1 = client.GetBuildNumberFromRevisionAndTime("22490e60db9f", builder, 0, 5);
-                build2 = client.GetBuildNumberFromRevisionAndTime("a62ae33069cd", builder, 0, 30, 5);
+                build1 = client.GetBuildNumberFromRevisionAndTime(revision_list[0], builder, 0, 5);
+                build2 = client.GetBuildNumberFromRevisionAndTime(revision_list[1], builder, 0, 30, 5);
                 if (build1 >= 0)
                 {
                     await client.StopBuild(project, builder, build1.ToString(), branch);
@@ -101,9 +108,9 @@ namespace Unity.Katana.IntegrationTests.Tests
                 if (counter > 60)
                     Assert.True(false, "Testcase failed after running for 5 minutes");
                 //// Read the build number ////
-                int _build1 = client.GetBuildNumberFromRevisionAndTime("bf98c4809fcc", builder, 0, 40, 5);
-                int _build2 = client.GetBuildNumberFromRevisionAndTime("a90e5d2c796d", builder, 0, 20, 5);
-                int _build3 = client.GetBuildNumberFromRevisionAndTime("8982804a2d35", builder, 0, 30, 5);
+                int _build1 = client.GetBuildNumberFromRevisionAndTime(revision_list[2], builder, 0, 40, 5);
+                int _build2 = client.GetBuildNumberFromRevisionAndTime(revision_list[3], builder, 0, 20, 5);
+                int _build3 = client.GetBuildNumberFromRevisionAndTime(revision_list[4], builder, 0, 30, 5);
 
                 if (_build1 >= 0)
                 {

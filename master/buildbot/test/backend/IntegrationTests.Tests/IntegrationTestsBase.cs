@@ -249,6 +249,36 @@ namespace Unity.Katana.IntegrationTests.Tests
             return result;
         }
 
+        public void RunActionForXTimes(Action action, int x)
+        {
+            if (x <= 2)
+            {
+                x = 5;
+            }
+            else
+            {
+                for (int i = 0; i < x; i++)
+                {
+                    action();
+                }
+            }
+        }
+
+        public async Task RunActionForXTimeAsync(Func<Task> func, int x)
+        {
+            if (x <= 2)
+            {
+                x = 5;
+            }
+            else
+            {
+                for (int i = 0; i < x; i++)
+                {
+                    await func();
+                }
+            }
+        }
+
         /// <summary>
         /// Assert the testcase by check the the number of element in errmsgs list 
         /// </summary>
