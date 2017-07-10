@@ -15,7 +15,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using FluentAssertions;
 
-
 namespace Unity.Katana.IntegrationTests.Tests
 {
     public class TriggerBuildsTest : IntegrationTestsBase

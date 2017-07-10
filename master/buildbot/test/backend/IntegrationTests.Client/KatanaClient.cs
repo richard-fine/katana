@@ -315,7 +315,17 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             int buildnr = -1;
             var resp = GetLastXBuilds(builder, num);
-            var content = JObject.Parse(resp.Result.Content.ReadAsStringAsync().Result);
+            JObject content = null;
+            try
+            {
+                content = JObject.Parse(resp.Result.Content.ReadAsStringAsync().Result);
+            }
+            catch (Exception e)
+            {
+                sw.WriteLine($"No content is parsed, content is . {resp.Result.Content.ReadAsStringAsync().Result} ");
+                throw;
+            }
+            
             int time = 0;
             sw.WriteLine($"Get {num} builds with revision {revision}. content :  {content.ToString()}");
             for (int i = 1; i <= num; i++)
@@ -456,6 +466,47 @@ namespace Unity.Katana.IntegrationTests.Client
             return response;
         }
 
+        public async Task<HttpResponseMessage> LaunchBuild(KatanaBuild katanabuild)
+        {
+            string project = katanabuild.Builder.Project;
+            string builder = katanabuild.Builder.Builder;
+            string branch = katanabuild.Builder.Branch;
+            string slave = katanabuild.Slave;
+            string priority = katanabuild.Prioirty;
+            string reason = katanabuild.Reason;
+            string revision = katanabuild.Revision;
+            bool force = katanabuild.Force;
+
+            string action = $"/projects/{project}/builders/{builder}/force?{project.ToLower()}_branch={branch}" + $"&returnpage=pending_json";
+
+            var slctslave = slave == null ? "default" : slave;
+            List<string> payload = new List<string>();
+            if (project == "Unity")
+            {
+                payload.Add($"forcescheduler={project.ToLower()}BuildersWithSmartSelect [force]");
+            }
+            else
+            {
+                payload.Add($"forcescheduler={project.ToLower()}+%5Bforce%5D");
+            }
+            payload.Add($"selected_slave={slctslave}");
+            payload.Add($"priority={priority}");
+            payload.Add($"reason={reason}");
+            payload.Add($"{project.ToLower()}_revision={revision}");
+            if (force)
+            {
+                payload.Add("checkbox=force_rebuild");
+            }
+
+            string content = string.Join("&", payload);
+            HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
+            katanabuild.Starting = true;
+            katanabuild.Running = false;
+            katanabuild.Stopped = false;
+            katanabuild.Stopping = false;
+            return response;
+        }
+
         public async Task<HttpResponseMessage> Rebuild(string project, 
                                                        string builder, 
                                                        string branch, 
@@ -500,6 +551,21 @@ namespace Unity.Katana.IntegrationTests.Client
             {
                 await Task.Delay(1000);
             }            
+            return response;
+        }
+
+        public async Task<HttpResponseMessage> StopBuild(KatanaBuild build, bool isWaiting = true)
+
+        {
+            string action = $"/projects/{build.Builder.Project}/builders/{build.Builder.Builder}" +
+                $"/builds/{build.Build}/stop?{build.Builder.Project.ToLower()}_branch={build.Builder.Branch}";
+
+            string content = "comments=Backend Integration Test force to stop";
+            HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
+            if (isWaiting)
+            {
+                await Task.Delay(1000);
+            }
             return response;
         }
 
