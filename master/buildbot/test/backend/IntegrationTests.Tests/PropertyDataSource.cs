@@ -38,13 +38,60 @@ namespace Unity.Katana.IntegrationTests.Tests
             );
 
 
+        public static IEnumerable<object[]> Data_TriggerBuildTest { get; } = new List<object[]>
+            {
+                new object[] {
+                    UnityMacEditorTrunk,
+                    new List<string>
+                    {
+                        "24c95392f5c2",
+                        "9683b9f88e0e",
+                        "43294e7c9854",
+                        "8d4e8eefeb52",
+                        "32e0dff84ceb"
+                    }
+                }
+
+            };
+
+        public static IEnumerable<object[]> Data_UseSpecifiedSlaveTest { get; } = new List<object[]>
+            {
+                new object[] {
+                    FMODAndroidTrunk,
+                    "85c3c6e06468"
+                }
+            };
+
+        public static IEnumerable<object[]> Data_RebuildTest { get; } = new List<object[]>
+            {
+                new object[] {
+                    FMODAndroidTrunk,
+                    "85c3c6e06468"
+                }
+            };
+
+        public static IEnumerable<object[]> Data_StopBuildWitRevisionReliabilityTest { get; } = new List<object[]>
+            {
+                new object[] {
+                    UnityMacEditorTrunk,
+                    new List<string>
+                    {
+                        "24c95392f5c2",
+                        "9683b9f88e0e",
+                        "43294e7c9854",
+                        "8d4e8eefeb52",
+                        "32e0dff84ceb"
+                    }
+                }
+
+            };
+
+
         public static IEnumerable<object[]> Data_StopAllRunningBuildReliabilityTest { get; } = new List<object[]>
             {
                 new object[] {
-                    "Unity",
-                    "proj0-Build MacEditor",
-                    "trunk",
-                    new string[]
+                    UnityMacEditorTrunk,
+                    new List<string>
                     {
                         "24c95392f5c2",
                         "9683b9f88e0e",

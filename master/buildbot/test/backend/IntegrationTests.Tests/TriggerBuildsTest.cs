@@ -23,8 +23,9 @@ namespace Unity.Katana.IntegrationTests.Tests
         /// Trigger three builds with different priority
         /// Verify that the execution order follows the priority
         /// </summary>        
-        [Fact]
-        public async Task TriggerBuildTest()
+        [Theory]
+        [MemberData("Data_TriggerBuildTest", MemberType =typeof(PropertyDataSource))]
+        public async Task TriggerBuildTest(KatanaBuilder katanabuilder, List<string> revision_list)
         {
             #region arrange
             string testcasename = GetTestcaseName();
@@ -34,17 +35,10 @@ namespace Unity.Katana.IntegrationTests.Tests
             JObject settings = JObject.Parse(File.ReadAllText(settingfile));
             string _baseAddress = settings["BaseAddress"].ToString();
             client.SetBaseAddress(_baseAddress);
-            Trace.WriteLine($"Set base address {_baseAddress}");
-            var setup = settings["TestSetup"].Where( x => (string)x["name"] == testcasename).ToArray().First();
-            var project = setup["project"].ToString();
-            var builder = setup["builder"].ToString();
-            var branch = setup["branch"].ToString();
-            JArray revisions = (JArray)setup["revisions"];
-            List<string> revision_list = new List<string>();
-            foreach (var rev in revisions)
-            {
-                revision_list.Add(rev.ToString());
-            }
+            Trace.WriteLine($"Set base address {_baseAddress}");            
+            var project = katanabuilder.Project;
+            var builder = katanabuilder.Builder;
+            var branch = katanabuilder.Branch;            
             Assert.True(revision_list.Count >= 5, "Test need at least 5 revision string");
             Trace.WriteLine($"Read parameter project : {project}, builder: {builder}, branch: {branch}");
             await FreeAllSlavesOfABuilder(client, builder);
@@ -158,8 +152,9 @@ namespace Unity.Katana.IntegrationTests.Tests
         /// Precondition: There are more than one slave free during test.
         /// </summary>
         /// <returns></returns>
-        [Fact]
-        public async Task UseSpecifiedSlaveTest()
+        [Theory]
+        [MemberData("Data_UseSpecifiedSlaveTest", MemberType = typeof(PropertyDataSource))]
+        public async Task UseSpecifiedSlaveTest(KatanaBuilder katanabuilder,string revision_short)
         {
             #region arrange
             string testcasename = GetTestcaseName();
@@ -168,13 +163,10 @@ namespace Unity.Katana.IntegrationTests.Tests
             var client = new KatanaClient();
 
             JObject settings = JObject.Parse(File.ReadAllText(settingfile));
-            client.SetBaseAddress(settings["BaseAddress"].ToString());
-            var setup = settings["TestSetup"].Where(x => (string)x["name"] == testcasename)
-                         .ToArray().First();
-            var project = setup["project"].ToString();
-            var builder = setup["builder"].ToString();
-            var branch = setup["branch"].ToString();
-            var revision_short = setup["revision"].ToString();
+            client.SetBaseAddress(settings["BaseAddress"].ToString());            
+            var project = katanabuilder.Project;
+            var builder = katanabuilder.Builder;
+            var branch = katanabuilder.Branch;                        
             await FreeAllSlavesOfABuilder(client, builder);
             #endregion
             #region action
@@ -329,8 +321,9 @@ namespace Unity.Katana.IntegrationTests.Tests
             #endregion
         }
 
-        [Fact]
-        public async Task RebuildTest()
+        [Theory]
+        [MemberData("Data_RebuildTest", MemberType = typeof(PropertyDataSource))]
+        public async Task RebuildTest(KatanaBuilder katanabuilder, string revision_short)
         {
             #region arrange
             string testcasename = GetTestcaseName();
@@ -341,12 +334,10 @@ namespace Unity.Katana.IntegrationTests.Tests
             JObject settings = JObject.Parse(File.ReadAllText(settingfile));
             string _baseAddress = settings["BaseAddress"].ToString();
             client.SetBaseAddress(_baseAddress);
-            Trace.WriteLine($"Set base address {_baseAddress}");
-            var setup = settings["TestSetup"].Where(x => (string)x["name"] == testcasename).ToArray().First();
-            var project = setup["project"].ToString();
-            var builder = setup["builder"].ToString();
-            var branch = setup["branch"].ToString();
-            var revision = setup["revision"].ToString();
+            Trace.WriteLine($"Set base address {_baseAddress}");            
+            var project = katanabuilder.Project;
+            var builder = katanabuilder.Builder;
+            var branch = katanabuilder.Branch;
             Trace.WriteLine($"Read parameter project : {project}, builder: {builder}, branch: {branch}");
             await FreeAllSlavesOfABuilder(client, builder);
             int cnt = 0;
@@ -392,7 +383,7 @@ namespace Unity.Katana.IntegrationTests.Tests
 
             if (!isSuccessBuildFound)
             {
-                await client.LaunchBuild(project, builder, branch, revision, "90", null, $"{testcasename}-1");
+                await client.LaunchBuild(project, builder, branch, revision_short, "90", null, $"{testcasename}-1");
                 Trace.WriteLine($"A build on builder {builder} of project {project} - branch {branch} is launched");
 
                 bool isBuildSuccess = false;

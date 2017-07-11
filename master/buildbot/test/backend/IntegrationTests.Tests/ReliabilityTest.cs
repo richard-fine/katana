@@ -33,8 +33,9 @@ namespace Unity.Katana.IntegrationTests.Tests
         /// <returns></returns>
         /// <remarks>There are async method not awaited, which is on purpose. Hope the behaviour can help 
         ///          trigger error </remarks>
-        [Fact]
-        public async Task StopBuildWitRevisionReliabilityTest()
+        [Theory]
+        [MemberData("Data_StopBuildWitRevisionReliabilityTest", MemberType = typeof(PropertyDataSource))]
+        public async Task StopBuildWitRevisionReliabilityTest(KatanaBuilder katanabuilder, List<string> revision_list)
         {
             #region arrange
             string testcasename = GetTestcaseName();
@@ -44,17 +45,10 @@ namespace Unity.Katana.IntegrationTests.Tests
             JObject settings = JObject.Parse(File.ReadAllText(settingfile));
             string _baseAddress = settings["BaseAddress"].ToString();
             client.SetBaseAddress(_baseAddress);
-            Trace.WriteLine($"Set base address {_baseAddress}");
-            var setup = settings["TestSetup"].Where(x => (string)x["name"] == testcasename).ToArray().First();
-            var project = setup["project"].ToString();
-            var builder = setup["builder"].ToString();
-            var branch = setup["branch"].ToString();
-            JArray revisions = (JArray)setup["revisions"];
-            List<string> revision_list = new List<string>();
-            foreach (var rev in revisions)
-            {
-                revision_list.Add(rev.ToString());
-            }
+            Trace.WriteLine($"Set base address {_baseAddress}");            
+            var project = katanabuilder.Project;
+            var builder = katanabuilder.Builder;
+            var branch = katanabuilder.Branch;            
             Assert.True(revision_list.Count >= 5, "Test need at least 5 revision string");
             Trace.WriteLine($"Read parameter project : {project}, builder: {builder}, branch: {branch}");
             bool isWaiting = false;
@@ -178,8 +172,7 @@ namespace Unity.Katana.IntegrationTests.Tests
 
         [Theory]
         [MemberData("Data_StopAllRunningBuildReliabilityTest", MemberType = typeof(PropertyDataSource))]
-        public async Task StopAllRunningBuildReliabilityTest(string project, string builder, 
-                                                             string branch, string[] revisions)
+        public async Task StopAllRunningBuildReliabilityTest(KatanaBuilder katanabuilder, List<string> revision_list)
         {
             #region arrange
             string testcasename = GetTestcaseName();
@@ -190,12 +183,9 @@ namespace Unity.Katana.IntegrationTests.Tests
             string _baseAddress = settings["BaseAddress"].ToString();
             client.SetBaseAddress(_baseAddress);
             Trace.WriteLine($"Set base address {_baseAddress}");
-            
-            List<string> revision_list = new List<string>();
-            foreach (var rev in revisions)
-            {
-                revision_list.Add(rev);
-            }
+            var project = katanabuilder.Project;
+            var builder = katanabuilder.Builder;
+            var branch = katanabuilder.Branch;            
             Assert.True(revision_list.Count >= 5, "Test need at least 5 revision string");
             Trace.WriteLine($"Read parameter project : {project}, builder: {builder}, branch: {branch}");
             bool isWaiting = false;
