@@ -66,6 +66,8 @@ class MasterConfig(object):
         self.title = 'Buildbot'
         self.titleURL = 'http://buildbot.net'
         self.buildbotURL = 'http://localhost:8080/'
+        self.elasticUrl = 'http://localhost:8080/'
+        self.elasticIndex = 'kevent_buildlogs-*'
         self.changeHorizon = None
         self.cleanUpPeriod = None
         self.buildRequestsDays = None
@@ -94,6 +96,7 @@ class MasterConfig(object):
         self.slave_debug_url = None
         # This URL will only be used if no slaveManagerUrl is present in master.cfg
         self.slaveManagerUrl = None
+        self.logstashConfDir = {}
 
         self.validation = dict(
             branch=re.compile(r'^[\w.+/~-]*$'),
@@ -131,7 +134,7 @@ class MasterConfig(object):
         "status", "title", "titleURL", "user_managers", "validation", "realTimeServer",
         "analytics_code", "gzip", "autobahn_push", "lastBuildCacheDays",
         "requireLogin", "globalFactory", "slave_debug_url", "slaveManagerUrl",
-        "cleanUpPeriod", "buildRequestsDays", "remoteCallTimeout"
+        "cleanUpPeriod", "buildRequestsDays", "remoteCallTimeout", "logstashConfDir", "elasticUrl", "elasticIndex"
     ])
 
     @classmethod
@@ -266,14 +269,16 @@ class MasterConfig(object):
         copy_str_param('title', alt_key='projectName')
         copy_str_param('titleURL', alt_key='projectURL')
 
+        copy_str_param('elasticUrl')
+        copy_str_param('elasticIndex')
         copy_str_param('buildbotURL')
-
         # Make sure that buildbotURL ends with a forward slash
         if not self.buildbotURL.endswith('/'):
             self.buildbotURL += '/'
 
         copy_str_param('realTimeServer')
         copy_str_param('analytics_code')
+        copy_param('logstashConfDir')
 
         copy_int_param('cleanUpPeriod')
         copy_int_param('changeHorizon')

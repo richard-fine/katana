@@ -142,7 +142,9 @@ define(function (require) {
                     run_time: runTime,
                     css_class: cssClass,
                     s: stepData,
-                    url: stepData.url
+                    url: stepData.url,
+                    build_number: data.number,
+                    step_number: count - 1,
                 };
                 html += hbBuild(props);
                 count += 1;

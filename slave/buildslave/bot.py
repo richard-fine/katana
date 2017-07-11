@@ -28,9 +28,14 @@ import buildslave
 from buildslave.pbutil import ReconnectingPBClientFactory
 from buildslave.commands import registry, base
 from buildslave import monkeypatches
+from datetime import datetime
+import logstashgen
+import re
 
 class UnknownCommand(pb.Error):
     pass
+
+LOG_DATE_FORMAT = '%Y-%m-%d-%H-%M-%S (UTC)'
 
 class SlaveBuilder(pb.Referenceable, service.Service):
 
@@ -61,7 +66,9 @@ class SlaveBuilder(pb.Referenceable, service.Service):
 
     def __init__(self, name):
         #service.Service.__init__(self) # Service has no __init__ method
+        self.commandLogFile = None
         self.setName(name)
+        self.logsdir = None
 
     def __repr__(self):
         return "<SlaveBuilder '%s' at %d>" % (self.name, id(self))
@@ -80,6 +87,7 @@ class SlaveBuilder(pb.Referenceable, service.Service):
         self.basedir = os.path.join(self.bot.basedir, self.builddir)
         if not os.path.isdir(self.basedir):
             os.makedirs(self.basedir)
+        self.logsdir = os.path.join(self.basedir, 'builds', 'logs')
 
     def stopService(self):
         service.Service.stopService(self)
@@ -93,6 +101,47 @@ class SlaveBuilder(pb.Referenceable, service.Service):
             if bslave:
                 bf = bslave.bf
                 bf.activity()
+
+    # TODO: check if there is another way of getting command parameters
+    def _getCommandInfo(self):
+        commandFirstArg = None
+        if 'command' in self.command.args:
+            commandName = self.command.args['command'][0] if self.command.args['command'] > 0 else None
+            commandFirstArg = self.command.args['command'][1] if self.command.args['command'] > 1 else None
+        else:
+            commandName = self.command.header
+
+        return commandName, commandFirstArg
+
+    def _createCommandLogFile(self, manifest):
+        commandName, commandArg = self._getCommandInfo()
+        commandLogFileName = 'step{}_{}_{}'.format(
+                manifest['stepNumber'],
+                datetime.utcnow().strftime(LOG_DATE_FORMAT),
+                commandName)
+
+        if commandArg:
+            commandLogFileName = commandLogFileName + "_" + commandArg
+
+        if not os.path.isdir(self.logsdir):
+            os.makedirs(self.logsdir)
+
+        commandLogFilePath = os.path.join(self.logsdir, self.escapeLogFileName(commandLogFileName + ".log"))
+        self.commandLogFile = open(commandLogFilePath, 'w')
+        log.msg("Created logfile %s" % commandLogFilePath)
+        return commandLogFilePath
+
+    def escapeLogFileName(self, commandLogFileName):
+        commandLogFileName = re.sub(r'[^\w\.\-]', '_', commandLogFileName)
+        return commandLogFileName
+
+    def saveCommandOutputToLog(self, data):
+        if self.commandLogFile:
+            self.commandLogFile.write(data)
+
+    def closeCommandLogFile(self):
+        if self.commandLogFile:
+            self.commandLogFile.close()
 
     def remote_setMaster(self, remote):
         self.remote = remote
@@ -112,7 +161,7 @@ class SlaveBuilder(pb.Referenceable, service.Service):
         if self.stopCommandOnShutdown:
             self.stopCommand()
 
-    def remote_startCommand(self, stepref, stepId, command, args):
+    def remote_startCommand(self, stepref, stepId, command, args, manifest=None):
         """
         This gets invoked by L{buildbot.process.step.RemoteCommand.start}, as
         part of various master-side BuildSteps, to start various commands
@@ -131,9 +180,16 @@ class SlaveBuilder(pb.Referenceable, service.Service):
             factory = registry.getFactory(command)
         except KeyError:
             raise UnknownCommand, "unrecognized SlaveCommand '%s'" % command
+
         self.command = factory(self, stepId, args)
 
-        log.msg(" startCommand:%s [id %s]" % (command,stepId))
+        if manifest:
+            self._createCommandLogFile(manifest)
+            if manifest["logstashConfDir"]:
+                self.bot.logstashgen.generate_logstash_config(manifest, self.logsdir)
+
+        log.msg(" startCommand:%s [id %s]" % (command, stepId))
+
         self.remoteStep = stepref
         self.remoteStep.notifyOnDisconnect(self.lostRemoteStep)
         d = self.command.doStart()
@@ -205,6 +261,7 @@ class SlaveBuilder(pb.Referenceable, service.Service):
 
     # this is fired by the Deferred attached to each Command
     def commandComplete(self, failure):
+        self.closeCommandLogFile()
         if failure:
             log.msg("SlaveBuilder.commandFailed", self.command)
             log.err(failure)
@@ -245,6 +302,7 @@ class Bot(pb.Referenceable, service.MultiService):
         self.usePTY = usePTY
         self.unicode_encoding = unicode_encoding or sys.getfilesystemencoding() or 'ascii'
         self.builders = {}
+        self.logstashgen = logstashgen.logstashgen()
 
     def startService(self):
         assert os.path.isdir(self.basedir)

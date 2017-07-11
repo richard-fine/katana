@@ -114,7 +114,7 @@ class RemoteCommand(pb.Referenceable):
         # We will get a single remote_complete when it finishes.
         # We should fire self.deferred when the command is done.
         d = self.remote.callRemote("startCommand", self, self.commandID,
-                                   self.remote_command, self.args)
+                                   self.remote_command, self.args, self.step.manifest)
         return d
 
     def _finished(self, failure=None):
@@ -426,6 +426,7 @@ class RemoteShellCommand(RemoteCommand):
         what = "command '%s' in dir '%s'" % (self.args['command'],
                                              self.args['workdir'])
         log.msg(what)
+
         return RemoteCommand._start(self)
 
     def __repr__(self):
@@ -524,6 +525,7 @@ class BuildStep(object, properties.PropertiesMixin):
 
         self._acquiringLock = None
         self.stopped = False
+        self.manifest = None
 
     def __new__(klass, *args, **kwargs):
         self = object.__new__(klass)
@@ -573,9 +575,27 @@ class BuildStep(object, properties.PropertiesMixin):
         # run on
         return [(l.getLock(self.build.slavebuilder.slave), la) for l, la in initialLocks]
 
+    def getLogstashConfigDir(self):
+        return self.build.builder.master.config.logstashConfDir[self.buildslave.os] \
+            if self.buildslave.os and self.buildslave.os in self.build.builder.master.config.logstashConfDir else None
+
+    def getManifest(self):
+        return {
+            'buildbotURL': self.build.builder.master.config.buildbotURL,
+            'buildNumber': self.build.build_status.number,
+            'builderName': self.build.builder.name,
+            'logstashConfDir': self.getLogstashConfigDir(),
+            'slaveName': self.build.slavename,
+            'stepName': self.name,
+            'stepNumber': self.step_status.step_number,
+            'sourcestamps': [ss.asDict() for ss in self.build.build_status.getSourceStamps()],
+            'reason': self.build.build_status.reason,
+            'owners': self.build.build_status.owners,
+        }
 
     def startStep(self, remote):
         self.remote = remote
+        self.manifest = self.getManifest()
         self.deferred = defer.Deferred()
         # convert all locks into their real form
         self.locks = [(self.build.builder.botmaster.getLockByID(access.lockid), access) 

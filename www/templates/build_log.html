@@ -1,0 +1,35 @@
+{% extends "layout.html" %} {% import 'submenu.html' as submenu %} {% set bodyId = 'id="build_log_page"' %} {% block extra_script %}
+<script type="text/javascript">
+require.deps.push('buildLog');
+</script>
+{% endblock %} {% block submenu %} {{submenu.buildsubmenu(active_page=build_number, pathNum=5, buildersPath=path_to_builders, codebasesPath=path_to_codebases, builderName=builder_name, builderPath=path_to_builder, buildNumber=build_number, stepName='', selectedProject=selectedproject)}} {% endblock %} {% block content %}
+<div class="log-status"></div>
+<div class="row">
+    <div class="col-md-3">
+        <input id="elastic-search" type="search" class="form-control" placeholder="Search">
+    </div>
+    <div class="col-md-6">
+        <input type="text" class="select2" id="log-field-filter" style="width:200px">
+        <!--<input id="log-field-value" type="search" class="form-control" placeholder="Field value">-->
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-12 log-cb-filters">
+        <input id="log-cb-errors" type="checkbox"> Show errors</input>
+        <input id="log-cb-warnings" type="checkbox"> Show warnings</input>
+        <!--<input id="log-cb-last-page" type="checkbox">Show last page</input>-->
+    </div>
+</div>
+<div class="row">
+    <div class="log-container">
+        <table>
+            <tbody id="log-content">
+            </tbody>
+        </table>
+        <div class="log-loading-icon">
+            <span class="spin-icon animate-spin pull-bottom"></span>
+        </div>
+        <!--</div>-->
+    </div>
+</div>
+{% endblock content %}
