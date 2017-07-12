@@ -143,13 +143,8 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/builders/{builder}/builds?" + RepeatQuery("select={0}", X);
-            Log.Information($"Read from {client.BaseAddress + url}");
-            Log.Information($"Read the client headers, which contains {client.DefaultRequestHeaders.Count()} items");
-            foreach (var item in client.DefaultRequestHeaders)
-            {
-                Log.Information($"Header of Client: {item.Key} : {item.Value}");                
-            }            
-            HttpResponseMessage response = await client.GetAsync(url,HttpCompletionOption.ResponseContentRead);
+            Log.Information($"Read from {client.BaseAddress + url}");            
+            HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
 
