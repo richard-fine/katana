@@ -31,10 +31,17 @@ from buildbot.util import lru
 import random
 
 def timerLogFinished(msg, timer):
-    log.msg(msg + " started at %s finished at %s elapsed %s" %
-            (util.epoch2datetime(timer.started),
-             util.epoch2datetime(util.now(timer._reactor)),
-             util.formatInterval(util.now(timer._reactor) - timer.started)))
+    finished = util.now(timer._reactor)
+    elapsed = "{0:.2f} secs".format(finished - timer.started)
+
+    log.msg(
+        msg + " started at %s finished at %s elapsed %s" %
+        (
+            util.epoch2datetime(timer.started),
+            finished,
+            elapsed
+        )
+    )
     timer.stop()
 
 def timerLogStart(msg, function_name):
@@ -1231,20 +1238,22 @@ class KatanaBuildRequestDistributor(service.Service):
 
         brids = [br.id for br in breqs]
         yield self.master.db.buildrequests.updateBuildRequests(brids, results=BEGINNING)
+          
+        buildDefered = self.katanaBuildChooser.bldr.maybeResumeBuild(slave, buildnumber, breqs)
+        buildDefered.addErrback(self._resume, breqs, self.katanaBuildChooser.bldr.name)
 
-        buildStarted = yield self.katanaBuildChooser.bldr.maybeResumeBuild(slave, buildnumber, breqs)
+        self.katanaBuildChooser.removeBuildRequests(breqs)
 
         msg = "_maybeResumeBuildOnBuilder is resuming build"
-
-        if not buildStarted:
-            yield self.master.db.buildrequests.updateBuildRequests(brids, results=RESUME)
-            self.botmaster.maybeStartBuildsForBuilder(self.katanaBuildChooser.bldr.name)
-            msg = "_maybeResumeBuildOnBuilder could not resume build"
-        else:
-            self.katanaBuildChooser.removeBuildRequests(breqs)
-
         self.logResumeOrStartBuildStatus(msg, slave, breqs)
-        defer.returnValue(buildStarted)
+        defer.returnValue(True)
+
+    @defer.inlineCallbacks
+    def _resume(self, e, breqs, builderName):
+        brids = [br.id for br in breqs]
+        log.msg("Could not resume builds {}. Exception message: {}. Requeueing.".format(brids, e.value))
+        yield self.master.db.buildrequests.updateBuildRequests(brids, results=RESUME)
+        self.botmaster.maybeStartBuildsForBuilder(builderName)
 
     @defer.inlineCallbacks
     def _maybeStartBuildsOnBuilder(self):
@@ -1255,24 +1264,23 @@ class KatanaBuildRequestDistributor(service.Service):
             return
 
         # claim brid's
-        brids = [br.id for br in breqs]
         yield self.katanaBuildChooser.claimBuildRequests(breqs)
 
-        buildStarted = yield self.katanaBuildChooser.bldr.maybeStartBuild(slave, breqs)
+        buildDefered = self.katanaBuildChooser.bldr.maybeStartBuild(slave, breqs)
+        buildDefered.addErrback(self._requeue, breqs, self.katanaBuildChooser.bldr.name)
 
         msg = "_maybeStartNewBuildsOnBuilder is starting build"
-
-        if not buildStarted:
-            yield self.master.db.buildrequests.unclaimBuildRequests(brids)
-            # and try starting builds again.  If we still have a working slave,
-            # then this may re-claim the same buildrequests
-            self.botmaster.maybeStartBuildsForBuilder(self.katanaBuildChooser.bldr.name)
-            msg = "_maybeStartNewBuildsOnBuilder could not start build"
-        else:
-            self.katanaBuildChooser.removeBuildRequests(breqs)
+        self.katanaBuildChooser.removeBuildRequests(breqs)
 
         self.logResumeOrStartBuildStatus(msg, slave, breqs)
-        defer.returnValue(buildStarted)
+        defer.returnValue(True)
+
+    @defer.inlineCallbacks
+    def _requeue(self, e, breqs, builderName):
+        brids = [br.id for br in breqs]
+        log.msg("Could not start builds {}. Exception message: {}. Requeueing.".format(brids, e.value))
+        yield self.master.db.buildrequests.unclaimBuildRequests(brids)
+        self.botmaster.maybeStartBuildsForBuilder(builderName)
 
     def createBuildChooser(self, builders, master):
         # just instantiate the build chooser requested
