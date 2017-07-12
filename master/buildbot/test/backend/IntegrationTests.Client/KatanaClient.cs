@@ -10,32 +10,37 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-
+using Serilog;
+using Serilog.Sinks.SystemConsole;
+using Serilog.Sinks.File;
 
 namespace Unity.Katana.IntegrationTests.Client
 {
     public class KatanaClient
     {
+        private static string settingfile = "katana.settings.json";
+
         private static readonly HttpClient client;
-        private static HttpClientHandler handler;
-        private static StreamWriter sw;
-        //private JObject settings = JObject.Parse("katana.settings.json");
+        private static HttpClientHandler handler;        
 
         public string url { get; set; }
 
         static KatanaClient()
         {
             handler = new HttpClientHandler();            
-            client = new HttpClient(handler);                        
-            sw = new StreamWriter(
-                    File.Create(
-                    $"katanaclientlog-{DateTime.UtcNow.ToUniversalTime().ToString("ddMMyyyyHHmmss")}.log")
-                    );
-
+            client = new HttpClient(handler);
+            JObject settings = JObject.Parse(File.ReadAllText(settingfile));
+            var name = settings["LogFileFolder"].ToString() +
+                       $"katanaclientlog-{DateTime.UtcNow.ToUniversalTime().ToString("HHmmss")}.log";
+            Log.Logger = new LoggerConfiguration()
+                .WriteTo.Console()                
+                .WriteTo.RollingFile(name)                
+                .CreateLogger();
         }
-                            
+
         public void SetBaseAddress(string url)
         {
+            Log.Information($"set base address {url}");
             if(client.BaseAddress == null) {
                 client.BaseAddress = new Uri(url);
             }
@@ -45,6 +50,7 @@ namespace Unity.Katana.IntegrationTests.Client
         public async Task<HttpResponseMessage> SendPostRequest(string url, string content, string contentType)
         {            
             var httpcontent = new StringContent(content, Encoding.UTF8, contentType);
+            Log.Information($"Send POST to {url} with content {httpcontent}");
             HttpResponseMessage response = await client.PostAsync(url, httpcontent);
             return response;
         }
@@ -53,6 +59,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = @"/json/builders/";
+            Log.Information($"Read from {client.BaseAddress+url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -61,6 +68,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/builders/{builder}";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -74,6 +82,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/builders/{builder}/builds";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -87,6 +96,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/builders/{builder}/builds/_all";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -101,6 +111,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/builders/{builder}/builds/{num.ToString()}";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -109,6 +120,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/builders/{builder}/builds/-1/sourcestamp/changes";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -122,6 +134,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/builders/{builder}/builds?props=0&steps=0";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -130,7 +143,13 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/builders/{builder}/builds?" + RepeatQuery("select={0}", X);
-            HttpResponseMessage response = await client.GetAsync(url);
+            Log.Information($"Read from {client.BaseAddress + url}");
+            Log.Information($"Read the client headers, which contains {client.DefaultRequestHeaders.Count()} items");
+            foreach (var item in client.DefaultRequestHeaders)
+            {
+                Log.Information($"Header of Client: {item.Key} : {item.Value}");                
+            }            
+            HttpResponseMessage response = await client.GetAsync(url,HttpCompletionOption.ResponseContentRead);
             return response;
         }
 
@@ -138,6 +157,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/builders/{builder}/builds?" + RepeatQuery("select={0}/source_stamp/changes", X);
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -146,6 +166,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/builders/{builder}/slaves?buildsteps=0&buildprops=0";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -154,6 +175,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/builders/{builder}/startslaves?buildsteps=0&buildprops=0";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -162,6 +184,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/builders/{builder}?select=&select=slaves";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -170,6 +193,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/slaves/{slave}?buildsteps=0&buildprops=0";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -178,6 +202,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/slaves/{slave}/builds";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -186,6 +211,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/slaves/{slave}/builders";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -194,6 +220,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/slaves/{slave}/builds/<{num.ToString()}?buildsteps=1&buildprops=1";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -202,6 +229,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/projects/";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -210,6 +238,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/projects/{project}";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -218,6 +247,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/projects/{project}/{builder}?buildsteps=0&buildprops=0";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -226,6 +256,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = @"/json/buildqueue/";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -234,6 +265,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/pending/{builder}/";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -242,6 +274,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = @"/json/globalstatus/";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -256,6 +289,7 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             SetContentType(ContentType.Json);
             var url = $"/json/builders/{builder}/builds/{buildNumber.ToString()}";
+            Log.Information($"Read from {client.BaseAddress + url}");
             HttpResponseMessage response = await client.GetAsync(url);
             return response;
         }
@@ -272,8 +306,17 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             int buildnr = -1;
             var resp = GetLastXBuilds(builder, num);
-            var content = JObject.Parse(resp.Result.Content.ReadAsStringAsync().Result);
-            sw.WriteLine($"Get {num} builds with revision {revision}. content :  {content.ToString()}");
+            if (resp.Result.StatusCode != HttpStatusCode.OK)
+            {
+                Log.Warning($"Return {resp.Result.StatusCode}, " +
+                            $"content: {resp.Result.Content.ReadAsStringAsync().Result}, try once again");
+                resp = GetLastXBuilds(builder, num);
+            }
+            string resp_string = resp.Result.Content.ReadAsStringAsync().Result;
+            CheckResponseIsJson(resp_string);
+
+            var content = JObject.Parse(resp_string);
+            Log.Information($"Getting {num} builds with revision {revision}.");
             for (int i = 1; i <= num; i++)
             {
                 string iStr = (i * -1).ToString();
@@ -282,19 +325,24 @@ namespace Unity.Katana.IntegrationTests.Client
                 {
                     rev = content[iStr]["sourceStamps"][0]["revision_short"].ToString();
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
-                    sw.WriteLine($"Revision nunmber {revision} is not found in {i} : content is {content[iStr]}");                    
+                    Log.Error($"Revision nunmber {revision} is not found in {i} : content is {content[iStr]}");
+                    Log.Error(e.Message);
+                    throw;
                 }
-                                
+
                 if (rev == revision)
-                {                 
+                {
                     buildnr = (int)content[iStr]["number"];
+                    Log.Information($"Find build number {builder}");
                     break;
-                }                
+                }
             }
             return buildnr;
         }
+
+        
 
 
         /// <summary>
@@ -315,19 +363,17 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             int buildnr = -1;
             var resp = GetLastXBuilds(builder, num);
-            JObject content = null;
-            try
+            if (resp.Result.StatusCode != HttpStatusCode.OK)
             {
-                content = JObject.Parse(resp.Result.Content.ReadAsStringAsync().Result);
+                Log.Warning($"Return {resp.Result.StatusCode}, " +
+                            $"content: {resp.Result.Content.ReadAsStringAsync().Result}, try once again");
+                resp = GetLastXBuilds(builder, num);
             }
-            catch (Exception e)
-            {
-                sw.WriteLine($"No content is parsed, content is . {resp.Result.Content.ReadAsStringAsync().Result} ");
-                throw;
-            }
-            
+            CheckResponseIsJson(resp.Result.Content.ReadAsStringAsync().Result);
+            JObject content = JObject.Parse(resp.Result.Content.ReadAsStringAsync().Result);
+                        
             int time = 0;
-            sw.WriteLine($"Get {num} builds with revision {revision}. content :  {content.ToString()}");
+            Log.Information($"Get {num} builds with revision {revision}.");
             for (int i = 1; i <= num; i++)
             {
                 string iStr = (i * -1).ToString();
@@ -336,9 +382,11 @@ namespace Unity.Katana.IntegrationTests.Client
                 {
                     rev = content[iStr]["sourceStamps"][0]["revision_short"].ToString();
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
-                    sw.WriteLine($"Revision nunmber {revision} is not found in {i} : content is {content[iStr]}");
+                    Log.Error($"Revision nunmber {revision} is not found in {i} : content is {content[iStr]}");
+                    Log.Error(e.Message);
+                    throw;
                 }
 
                 try
@@ -346,27 +394,36 @@ namespace Unity.Katana.IntegrationTests.Client
                     double _time = 0;
                     if (typeoftime == 0)
                     {
-                        _time = (double)content[iStr]["times"][0];
+                        if ((string)content[iStr]["times"][0] != null)
+                        {
+                            _time = (double)content[iStr]["times"][0];
+                        }                        
                     }
                     else if (typeoftime == 1)
                     {
-                        _time = (double)content[iStr]["times"][1];
+                        if ((string)content[iStr]["times"][1] != null)
+                        {
+                            _time = (double)content[iStr]["times"][1];
+                        }                        
                     }                     
                     var _seconds = Math.Truncate(_time);
                     time = (int)_seconds;
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
-                    sw.WriteLine($"Finish time {time} is not found in {i} : content is {content[iStr]}");
+                    Log.Error($"Finish time {time} is not found in {i} : content is {content[iStr]}");
+                    Log.Error(e.Message);
+                    throw;
                 }
 
                 var datanow = (DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0)).TotalSeconds;
-
-                var diff = datanow - time;  
+                var diff = datanow - time;
+                Log.Debug($"Different is {diff}");
 
                 if (rev == revision && diff <= interval)
                 {
                     buildnr = (int)content[iStr]["number"];
+                    Log.Information($"Found build number {buildnr}");
                     break;
                 }
             }
@@ -387,8 +444,15 @@ namespace Unity.Katana.IntegrationTests.Client
             List<int> buildsnr = new List<int>();
             //List<int> buildsnr = Enumerable.Repeat(-1, X - 1).ToList();
             var resp = GetLastXBuilds(builder, num);
-            var content = JObject.Parse(resp.Result.Content.ReadAsStringAsync().Result);
-            sw.WriteLine($"Get {num} build with revision {revision}. content :  {content.ToString()}");
+            if (resp.Result.StatusCode != HttpStatusCode.OK)
+            {
+                Log.Warning($"Return {resp.Result.StatusCode}, " +
+                            $"content: {resp.Result.Content.ReadAsStringAsync().Result}, try once again");
+                resp = GetLastXBuilds(builder, num);
+            }
+            CheckResponseIsJson(resp.Result.Content.ReadAsStringAsync().Result);
+            JObject content = JObject.Parse(resp.Result.Content.ReadAsStringAsync().Result);
+            Log.Information($"Get {num} build with revision {revision}.");
             //// Loop 'num' times, to find the build which has a match of revision number,  ////
             //// and add the build number into list ////
             for (int i = 1; i <= num; i++)
@@ -399,15 +463,18 @@ namespace Unity.Katana.IntegrationTests.Client
                 {
                     rev = content[iStr]["sourceStamps"][0]["revision_short"].ToString();
                 }
-                catch (Exception)
-                {
-                    sw.WriteLine($"Revision nunmber {revision} is not found in {i} : content is {content[iStr]}");                    
+                catch (Exception e)
+                {                    
+                    Log.Error($"Revision nunmber {revision} is not found in {i} : content is {content[iStr]}");
+                    Log.Error(e.Message);
+                    throw;
                 }
                     
 
                 if (rev == revision)
                 {
                     buildsnr.Add((int)content[iStr]["number"]);
+                    Log.Information($"Found and Added build number {(int)content[iStr]["number"]}");
                     if (buildsnr.Count >= X)
                     {
                         break;
@@ -421,6 +488,7 @@ namespace Unity.Katana.IntegrationTests.Client
                 for (int i = buildsnr.Count; i < X; i++)
                 {
                     buildsnr[i] = -1;
+                    Log.Warning("Not enough valid build numbers are found, add -1 into list");
                 }
             }
 
@@ -462,6 +530,7 @@ namespace Unity.Katana.IntegrationTests.Client
             }
             
             string content = string.Join("&", payload);
+            Log.Information($"Launch build on {client.BaseAddress + action}, with payload {content}");
             HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
             return response;
         }
@@ -499,6 +568,7 @@ namespace Unity.Katana.IntegrationTests.Client
             }
 
             string content = string.Join("&", payload);
+            Log.Information($"Launch build on {client.BaseAddress + action}, with payload {content}");
             HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
             katanabuild.Starting = true;
             katanabuild.Running = false;
@@ -516,6 +586,7 @@ namespace Unity.Katana.IntegrationTests.Client
             string action = $"/projects/{project}/builders/{builder}/builds/{build}/rebuild?" +
                 $"{project.ToLower()}_branch={branch}&property1name=force_rebuild&property1value=True";
             string content = $"comments={reason}";
+            Log.Information($"Rebuild on {client.BaseAddress + action}, with payload {content}");
             HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
             return response;
         }
@@ -524,15 +595,23 @@ namespace Unity.Katana.IntegrationTests.Client
                                                                      bool isWaiting = true)
         {
             HttpResponseMessage response = await GetABuilderInfo(builder);
+            if (response.StatusCode != HttpStatusCode.OK)
+            {
+                Log.Warning($"Return {response.StatusCode}, " +
+                            $"content: {response.Content.ReadAsStringAsync().Result}, try once again");
+                response = await GetABuilderInfo(builder);
+            }
             HttpResponseMessage resp = null;
+            CheckResponseIsJson(response.Content.ReadAsStringAsync().Result);
             var content = JObject.Parse(response.Content.ReadAsStringAsync().Result);
-            sw.WriteLine($"Read builder {builder} on {project}/{branch} : {content}");
-            JArray currentBuilds = (JArray)content["currentBuilds"];
+            Log.Information($"Read builder {builder} on {project}/{branch}");
+            JArray currentBuilds = (JArray)content["currentBuilds"];            
             if (currentBuilds != null)
             {
                 foreach (var currentBuild in currentBuilds)
                 {
                     string build = currentBuild["number"].ToString();
+                    Log.Information($"Stop build #{build} on {project}/{builder}/{branch}");
                     resp = await StopBuild(project, builder, build, branch, isWaiting);                    
                 }                
             }
@@ -546,6 +625,7 @@ namespace Unity.Katana.IntegrationTests.Client
             string action = $"/projects/{project}/builders/{builder}/builds/{build}/stop?" +
                 $"{project.ToLower()}_branch={branch}";
             string content = "comments=Backend Integration Test force to stop";
+            Log.Information($"Stop build #{build} on {project}/{builder}/{branch}");
             HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
             if (isWaiting)
             {
@@ -561,6 +641,8 @@ namespace Unity.Katana.IntegrationTests.Client
                 $"/builds/{build.Build}/stop?{build.Builder.Project.ToLower()}_branch={build.Builder.Branch}";
 
             string content = "comments=Backend Integration Test force to stop";
+            Log.Information($"Stop build #{build.Build} on {build.Builder.Project}/{build.Builder.Builder}" +
+                $"/{build.Builder.Branch}");
             HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
             if (isWaiting)
             {
@@ -578,6 +660,7 @@ namespace Unity.Katana.IntegrationTests.Client
         public async Task<HttpResponseMessage> StopBuild(string url, bool isWaiting = true)
         {            
             string content = "comments=Backend Integration Test force to stop";
+            Log.Information($"Stop build at {url}");
             HttpResponseMessage response = await SendPostRequest(url, content, ContentType.wwwForm);
             if (true)
             {
@@ -591,7 +674,8 @@ namespace Unity.Katana.IntegrationTests.Client
         {
             string action = $"/projects/{project}/builders/{builder}/builds/{build}/stopchain?" +
                 $"{project.ToLower()}_branch={branch}";
-            string content = "comments=Backend Integration Test force to stop the build chain";            
+            string content = "comments=Backend Integration Test force to stop the build chain";
+            Log.Information($"Stop build chain #{build} on {project}/{builder}/{branch}");
             HttpResponseMessage response = await SendPostRequest(action, content, ContentType.wwwForm);
             if (isWaiting)
             {
@@ -639,9 +723,33 @@ namespace Unity.Katana.IntegrationTests.Client
 
         private void SetContentType(string type)
         {
-            client.DefaultRequestHeaders
+            var _mediatype = new MediaTypeWithQualityHeaderValue(type);
+            if (!client.DefaultRequestHeaders.Accept.Contains(_mediatype))
+            {
+                client.DefaultRequestHeaders
                     .Accept
-                    .Add(new MediaTypeWithQualityHeaderValue(type));
+                    .Add(_mediatype);
+                Log.Information($"Client does not have type {_mediatype.ToString()}, Add to header");
+            }
+            else
+            {
+                Log.Information($"Client has already had type {_mediatype.ToString()}.");
+            }
+        }
+
+        private void CheckResponseIsJson(string resp)
+        {
+            try
+            {
+                Log.Information("Try to parse the string to JSON");
+                JContainer.Parse(resp);
+            }
+            catch (Exception e)
+            {
+                Log.Error($"The return is not parseable, content is {resp}");
+                Log.Error(e.Message);
+                throw;
+            }
         }
 
         public void Dispose()

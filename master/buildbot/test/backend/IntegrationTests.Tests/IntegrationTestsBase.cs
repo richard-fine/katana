@@ -13,6 +13,11 @@ using Unity.Katana.IntegrationTests.Client;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Xunit;
+using Xunit.Abstractions;
+using Serilog;
+using Serilog.Sinks.RollingFile;
+using Serilog.Sinks.SystemConsole;
+using Serilog.Sinks.XUnit;
 
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
 namespace Unity.Katana.IntegrationTests.Tests
@@ -20,6 +25,40 @@ namespace Unity.Katana.IntegrationTests.Tests
     public class IntegrationTestsBase
     {
         protected string settingfile = "test.json";
+
+        protected void TestLog(string msg, ILogger logger, string level = "Information")
+        {
+            switch (level)
+            {
+                case "Information":
+                    logger.Information(msg);                    
+                    break;
+                case "Warning":
+                    logger.Warning(msg);                    
+                    break;
+                case "Error":
+                    logger.Error(msg);
+                    break;
+                default:
+                    logger.Information(msg);
+                    break;
+            }
+            Trace.WriteLine(msg);
+        }
+
+        protected string SetupLogFileName(string testcasename, string folder = "")
+        {
+            string datetime = DateTime.UtcNow.ToUniversalTime().ToString("HHmmss");
+            if (string.IsNullOrEmpty(folder))
+            {
+                return $"{testcasename}-{datetime}.log";
+            }
+            else
+            {
+                return $"{folder}{testcasename}-{datetime}.log";
+            }
+            
+        }
 
         /// <summary>
         /// Setup the trace file for each testcase.
@@ -231,15 +270,35 @@ namespace Unity.Katana.IntegrationTests.Tests
         /// <returns></returns>
         public JArray ParseJArrayResponse(HttpResponseMessage resp)
         {
+            JArray result = null;
             var content = resp.Content.ReadAsStringAsync().Result;
-            JArray result = JArray.Parse(content);
+            try
+            {
+               result = JArray.Parse(content);
+            }
+            catch (Exception e)
+            {
+
+                Debug.WriteLine($"{e.Message}: content is {content}");
+                throw;
+            }
+            
             return result;
         }
 
         public JObject ParseJObjectResponse(HttpResponseMessage resp)
         {
             var content = resp.Content.ReadAsStringAsync().Result;
-            JObject result = JObject.Parse(content);
+            JObject result = null;
+            try
+            {
+                result = JObject.Parse(content);
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine($"{e.Message}: content is {content}");
+                throw;
+            }            
             return result;
         }
 

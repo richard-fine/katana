@@ -7,6 +7,7 @@ namespace Unity.Katana.IntegrationTests.Tests
 {
     public static class PropertyDataSource
     {
+        #region Builder Definition
         private static KatanaBuilder UnityMacEditorTrunk = new KatanaBuilder(
             "Unity",
             "proj0-Build MacEditor",
@@ -36,8 +37,9 @@ namespace Unity.Katana.IntegrationTests.Tests
             "proj39-Build%20ATICompress%20Complete",
             "default"
             );
+        #endregion
 
-
+        #region Data Source for each testcases
         public static IEnumerable<object[]> Data_TriggerBuildTest { get; } = new List<object[]>
             {
                 new object[] {
@@ -81,11 +83,11 @@ namespace Unity.Katana.IntegrationTests.Tests
                         "43294e7c9854",
                         "8d4e8eefeb52",
                         "32e0dff84ceb"
-                    }
+                    },
+                    20
                 }
 
             };
-
 
         public static IEnumerable<object[]> Data_StopAllRunningBuildReliabilityTest { get; } = new List<object[]>
             {
@@ -98,7 +100,8 @@ namespace Unity.Katana.IntegrationTests.Tests
                         "43294e7c9854",
                         "8d4e8eefeb52",
                         "32e0dff84ceb"
-                    }
+                    },
+                    20
                 }
 
             };
@@ -111,12 +114,10 @@ namespace Unity.Katana.IntegrationTests.Tests
                         new KatanaBuild(UnityMacEditorTrunk, "9683b9f88e0e"),
                         new KatanaBuild(UnityTestDeploymentTestsServiceTizenTrunk, "8d4e8eefeb52"),
                         new KatanaBuild(FMODAndroidTrunk, "85c3c6e06468")
-                    }
-                    
-                }
+                    },
+                    20
+                }                
             };
+        #endregion
     }
 }
-
-
-

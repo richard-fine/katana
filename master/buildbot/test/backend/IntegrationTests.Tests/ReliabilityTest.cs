@@ -15,15 +15,21 @@ using Unity.Katana.IntegrationTests.Framework;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using FluentAssertions;
+using Xunit.Abstractions;
+using Serilog;
+using Serilog.Events;
+using Serilog.Sinks.RollingFile;
+using Serilog.Sinks.SystemConsole;
+using Serilog.Sinks.XUnit;
 
 namespace Unity.Katana.IntegrationTests.Tests
 {
     public class ReliabilityTest : IntegrationTestsBase
     {
-        private readonly ITestOutputHelper output;
+        private readonly ITestOutputHelper _output;
         public ReliabilityTest(ITestOutputHelper output)
         {
-            this.output = output;
+            this._output = output;
         }
 
         /// <summary>
@@ -35,29 +41,36 @@ namespace Unity.Katana.IntegrationTests.Tests
         ///          trigger error </remarks>
         [Theory]
         [MemberData("Data_StopBuildWitRevisionReliabilityTest", MemberType = typeof(PropertyDataSource))]
-        public async Task StopBuildWitRevisionReliabilityTest(KatanaBuilder katanabuilder, List<string> revision_list)
+        public async Task StopBuildWitRevisionReliabilityTest(KatanaBuilder katanabuilder, List<string> revision_list,
+                                                              int round = 20)
         {
             #region arrange
+            JObject settings = JObject.Parse(File.ReadAllText(settingfile));
+            string logfilefolder = settings["LogFileFolder"].ToString();
             string testcasename = GetTestcaseName();
-            TextWriterTraceListener myTextListener = SetupTraceFile($"{testcasename}.log");
+            string logfilename = SetupLogFileName(testcasename, logfilefolder);
+            ILogger _logger = new LoggerConfiguration()
+                            .WriteTo.Console()
+                            .WriteTo.RollingFile(logfilename)
+                            .WriteTo.TestOutput(_output, LogEventLevel.Verbose)
+                            .CreateLogger();
+            
             var client = new KatanaClient();
 
-            JObject settings = JObject.Parse(File.ReadAllText(settingfile));
             string _baseAddress = settings["BaseAddress"].ToString();
             client.SetBaseAddress(_baseAddress);
-            Trace.WriteLine($"Set base address {_baseAddress}");            
+            TestLog($"Set base address {_baseAddress}", _logger);
             var project = katanabuilder.Project;
             var builder = katanabuilder.Builder;
             var branch = katanabuilder.Branch;            
             Assert.True(revision_list.Count >= 5, "Test need at least 5 revision string");
-            Trace.WriteLine($"Read parameter project : {project}, builder: {builder}, branch: {branch}");
-            bool isWaiting = false;
-            int length = 20;
+            TestLog($"Read parameter project : {project}, builder: {builder}, branch: {branch}", _logger);
+            bool isWaiting = false;            
             #endregion
 
             #region action
             //// launch 5 setup builds to make the slave busy  ////
-            for (int i = 0; i < length; i++)
+            for (int i = 0; i < round; i++)
             {
                 await client.LaunchBuild(project, builder, branch, revision_list[0], "99");
                 await client.LaunchBuild(project, builder, branch, revision_list[1], "99");
@@ -65,7 +78,7 @@ namespace Unity.Katana.IntegrationTests.Tests
                 await client.LaunchBuild(project, builder, branch, revision_list[3], "90");
                 await client.LaunchBuild(project, builder, branch, revision_list[4], "40");
                 Thread.Sleep(10000);
-                Trace.WriteLine("5 builds are launched");
+                TestLog("5 builds are launched", _logger);
 
                 bool isBuild1Stopped = false;
                 bool isBuild2Stopped = false;
@@ -100,7 +113,7 @@ namespace Unity.Katana.IntegrationTests.Tests
                             async () => await client.StopBuild(project, builder, build1.ToString(), branch, isWaiting);
 
                         RunActionForXTimeAsync(func, 5);
-                        Trace.WriteLine($"Stopping build1 #{build1}");
+                        TestLog($"Stopping build1 #{build1}", _logger);
                         //Thread.Sleep(1000);
                         isBuild1Stopped = true;
                     }
@@ -110,7 +123,7 @@ namespace Unity.Katana.IntegrationTests.Tests
                             async () => await client.StopBuild(project, builder, build2.ToString(), branch, isWaiting);
 
                         RunActionForXTimeAsync(func, 5);
-                        Trace.WriteLine($"Stopping build2 #{build2}");
+                        TestLog($"Stopping build2 #{build2}", _logger);
                         isBuild2Stopped = true;
                     }
 
@@ -120,7 +133,7 @@ namespace Unity.Katana.IntegrationTests.Tests
                             async () => await client.StopBuild(project, builder, build3.ToString(), branch, isWaiting);
 
                         RunActionForXTimeAsync(func, 5);
-                        Trace.WriteLine($"Stopping build3 #{build3}");
+                        TestLog($"Stopping build3 #{build3}", _logger);
                         isBuild3Stopped = true;
 
                     }
@@ -130,7 +143,7 @@ namespace Unity.Katana.IntegrationTests.Tests
                             async () => await client.StopBuild(project, builder, build4.ToString(), branch, isWaiting);
 
                         RunActionForXTimeAsync(func, 5);
-                        Trace.WriteLine($"Stopping build4 #{build4}");
+                        TestLog($"Stopping build4 #{build4}", _logger);
                         isBuild4Stopped = true;
                     }
 
@@ -140,18 +153,18 @@ namespace Unity.Katana.IntegrationTests.Tests
                             async () => await client.StopBuild(project, builder, build5.ToString(), branch, isWaiting);
 
                         RunActionForXTimeAsync(func, 5);
-                        Trace.WriteLine($"Stopping build5 #{build5}");
+                        TestLog($"Stopping build5 #{build5}", _logger);
                         isBuild5Stopped = true;
                     }
                     if (!isBuild1Stopped || !isBuild2Stopped ||
                         !isBuild3Stopped || !isBuild4Stopped || !isBuild5Stopped)
-                        Trace.WriteLine("not all the builds are stopped,   " +
+                        TestLog("not all the builds are stopped,   " +
                             $"build1: {isBuild1Stopped.ToString()}," +
                             $"build2: {isBuild2Stopped.ToString()}, " +
                             $"build3: {isBuild3Stopped.ToString()}, " +
                             $"build4: {isBuild4Stopped.ToString()}, " +
                             $"build5: {isBuild5Stopped.ToString()}" +
-                            "refresh after 5 seconds");
+                            "refresh after 5 seconds", _logger);
                     Thread.Sleep(5000);
                 }
                 #endregion
@@ -166,30 +179,45 @@ namespace Unity.Katana.IntegrationTests.Tests
                 Thread.Sleep(5000);
             }
             #region clean up and assertion            
-            WriteTraceToFile(myTextListener);
+            
             #endregion
         }
 
+
+        /// <summary>
+        /// Launch 5 builds, and stop all the running builds, repeat 20 times
+        /// </summary>
+        /// <param name="katanabuilder"></param>
+        /// <param name="revision_list"></param>
+        /// <returns></returns>
         [Theory]
         [MemberData("Data_StopAllRunningBuildReliabilityTest", MemberType = typeof(PropertyDataSource))]
-        public async Task StopAllRunningBuildReliabilityTest(KatanaBuilder katanabuilder, List<string> revision_list)
+        public async Task StopAllRunningBuildReliabilityTest(KatanaBuilder katanabuilder, List<string> revision_list,
+                                                             int round = 20)
         {
             #region arrange
+            JObject settings = JObject.Parse(File.ReadAllText(settingfile));
+            string logfilefolder = settings["LogFileFolder"].ToString();
             string testcasename = GetTestcaseName();
-            TextWriterTraceListener myTextListener = SetupTraceFile($"{testcasename}.log");
+            string logfilename = SetupLogFileName(testcasename, logfilefolder);
+            ILogger _logger = new LoggerConfiguration()
+                            .WriteTo.Console()
+                            .WriteTo.RollingFile(logfilename)
+                            .WriteTo.TestOutput(_output, LogEventLevel.Verbose)
+                            .CreateLogger();
+            
             var client = new KatanaClient();
 
-            JObject settings = JObject.Parse(File.ReadAllText(settingfile));
+            
             string _baseAddress = settings["BaseAddress"].ToString();
             client.SetBaseAddress(_baseAddress);
-            Trace.WriteLine($"Set base address {_baseAddress}");
+            TestLog($"Set base address {_baseAddress}", _logger);
             var project = katanabuilder.Project;
             var builder = katanabuilder.Builder;
             var branch = katanabuilder.Branch;            
             Assert.True(revision_list.Count >= 5, "Test need at least 5 revision string");
-            Trace.WriteLine($"Read parameter project : {project}, builder: {builder}, branch: {branch}");
-            bool isWaiting = false;
-            int length = 20;
+            TestLog($"Read parameter project : {project}, builder: {builder}, branch: {branch}", _logger);
+            bool isWaiting = false;            
             HttpResponseMessage resp = null;
             JObject builds = null;
             //await FreeAllSlavesOfABuilder(client, builder);
@@ -197,7 +225,7 @@ namespace Unity.Katana.IntegrationTests.Tests
 
             #region action
             //// launch 5 setup builds to make the slave busy  ////
-            for (int i = 0; i < length; i++)
+            for (int i = 0; i < round; i++)
             {
                 await client.LaunchBuild(project, builder, branch, revision_list[0], "99");
                 await client.LaunchBuild(project, builder, branch, revision_list[1], "99");
@@ -205,7 +233,7 @@ namespace Unity.Katana.IntegrationTests.Tests
                 await client.LaunchBuild(project, builder, branch, revision_list[3], "90");
                 await client.LaunchBuild(project, builder, branch, revision_list[4], "40");
                 Thread.Sleep(10000);
-                Trace.WriteLine("5 builds are launched");
+                TestLog("5 builds are launched", _logger);
 
                 bool isRunningOrPendingBuild = true;
                 int counter = 0;
@@ -231,14 +259,14 @@ namespace Unity.Katana.IntegrationTests.Tests
                                             async () =>
                                             await client.StopBuild(project, builder,
                                                                    buildnr.ToString(), branch, isWaiting);
-                                Trace.WriteLine($"Stop build#{buildnr}");
+                                TestLog($"Stop build#{buildnr}", _logger);
 
                                 RunActionForXTimeAsync(func, 5);
                             }
                         }
                         else
                         {
-                            Trace.WriteLine($"Builds#{build["number"].ToString()} has result : {build["results"]}");
+                            TestLog($"Builds#{build["number"].ToString()} has result : {build["results"]}", _logger);
                         }
                     }
 
@@ -256,14 +284,13 @@ namespace Unity.Katana.IntegrationTests.Tests
                                             async () =>
                                             await client.StopBuild(project, builder,
                                                                    buildnr.ToString(), branch, isWaiting);
-                                Trace.WriteLine($"Stop build#{buildnr}");
-
+                                TestLog($"Stop build#{buildnr}", _logger);
                                 RunActionForXTimeAsync(func, 5);
                             }
                         }
                         else
                         {
-                            Trace.WriteLine($"Builds#{build["number"].ToString()} has result : {build["results"]}");
+                            TestLog($"Builds#{build["number"].ToString()} has result : {build["results"]}", _logger);
                         }
                     }
 
@@ -273,11 +300,12 @@ namespace Unity.Katana.IntegrationTests.Tests
                     if (pendingBuilds.Count > 0)
                     {
                         _isPendingbuild = true;
-                        Trace.WriteLine($"{pendingBuilds.Count} builds are pending.");
+                        TestLog($"{pendingBuilds.Count} builds are pending.", _logger);
                     }
 
                     isRunningOrPendingBuild = _isRunningbuild || _isPendingbuild;
-                    Trace.WriteLine($"Running build: {_isRunningbuild.ToString()}, Pending build: {_isPendingbuild.ToString()}");
+                    TestLog($"Running build: {_isRunningbuild.ToString()}, Pending build: {_isPendingbuild.ToString()}",
+                            _logger);
                     Thread.Sleep(5000);
                 }
 
@@ -290,48 +318,54 @@ namespace Unity.Katana.IntegrationTests.Tests
             {
                 //"No builds has null result, meaning they are not running "
                 JObject build = (JObject)kvp.Value;
-                Trace.WriteLine($"Result is {build["results"]}");
+                TestLog($"Result is {build["results"]}", _logger);
                 Assert.NotNull(build["results"]);
             }            
-            WriteTraceToFile(myTextListener);
+            
             //await client.StopAllBuildOnBuilder(project, builder, branch);            
             #endregion
         }
 
 
         /// <summary>
-        /// Launch builds on muiltple builder, and stop them!
+        /// Launch builds on muiltple builders, and stop them. repeat 20 times
         /// </summary>
         /// <returns></returns>
         [Theory]
         [MemberData("Data_StopBuildsOnMultipleBuilder", MemberType = typeof(PropertyDataSource))]        
-        public async Task StopBuildsOnMultipleBuilder(List<KatanaBuild> katanabuilds)
+        public async Task StopBuildsOnMultipleBuilder(List<KatanaBuild> katanabuilds, int round = 20)
         {
             #region arrange
-            string testcasename = GetTestcaseName();
-            TextWriterTraceListener myTextListener = SetupTraceFile($"{testcasename}.log");
-            var client = new KatanaClient();
-
             JObject settings = JObject.Parse(File.ReadAllText(settingfile));
+            string logfilefolder = settings["LogFileFolder"].ToString();
+            string testcasename = GetTestcaseName();
+            string logfilename = SetupLogFileName(testcasename, logfilefolder);
+            ILogger _logger = new LoggerConfiguration()
+                            .WriteTo.Console()
+                            .WriteTo.RollingFile(logfilename)
+                            .WriteTo.TestOutput(_output, LogEventLevel.Verbose)
+                            .CreateLogger();
+            var client = new KatanaClient();
+            
             string _baseAddress = settings["BaseAddress"].ToString();
             client.SetBaseAddress(_baseAddress);
-            Trace.WriteLine($"Set base address {_baseAddress}");
+            TestLog($"Set base address {_baseAddress}", _logger);
                                     
-            bool isWaiting = false;
-            int length = 20;
+            bool isWaiting = false;            
             #endregion
 
-            for (int i = 0; i < length; i++)
+            for (int i = 0; i < round; i++)
             {
-                Trace.WriteLine($"Iteration # {i}");
+                TestLog($"Iteration # {i}", _logger);
                 foreach (var katanabuild in katanabuilds)
                 {
                     await FreeAllSlavesOfABuilder(client, katanabuild.Builder.Builder);
                     await client.LaunchBuild(katanabuild);
-                    Trace.WriteLine($"Read parameter project : {katanabuild.Builder.Project}, " +
+                    TestLog($"Read parameter project : {katanabuild.Builder.Project}, " +
                                                    $"builder: {katanabuild.Builder.Builder}, " +
                                                    $"branch: {katanabuild.Builder.Branch}" +
-                                                   $"revision: {katanabuild.Revision}");
+                                                   $"revision: {katanabuild.Revision}", 
+                                                   _logger);
 
                     Thread.Sleep(1000);
                 }
@@ -355,7 +389,7 @@ namespace Unity.Katana.IntegrationTests.Tests
                         {
                             Func<Task> func = async () => await client.StopBuild(katanabuild, isWaiting);
                             await RunActionForXTimeAsync(func, 5);
-                            Trace.WriteLine($"Stopping build #{katanabuild.Build}");
+                            TestLog($"Stopping build #{katanabuild.Build}", _logger);
                             katanabuild.Starting = false;
                             katanabuild.Running = false;
                             katanabuild.Stopped = false;
@@ -365,10 +399,10 @@ namespace Unity.Katana.IntegrationTests.Tests
 
                     if (katanabuilds.Any(s => !s.Stopping))
                     {
-                        Trace.WriteLine("not all the builds are stopped, refresh after 5 seconds : ");
+                        TestLog("not all the builds are stopped, refresh after 5 seconds : ", _logger);
                         foreach (var katanabuild in katanabuilds)
                         {
-                            Trace.WriteLine($"Build#{katanabuild.Build} : {katanabuild.Stopping.ToString()}");
+                            TestLog($"Build#{katanabuild.Build} : {katanabuild.Stopping.ToString()}", _logger);
                         }
                     }                    
                 }
@@ -386,8 +420,7 @@ namespace Unity.Katana.IntegrationTests.Tests
                 Thread.Sleep(5000);
             }
             
-            #region clean up and assertion            
-            WriteTraceToFile(myTextListener);
+            #region clean up and assertion                        
             #endregion
         }
 

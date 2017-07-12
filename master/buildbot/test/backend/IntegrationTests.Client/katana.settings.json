@@ -1,5 +1,3 @@
-{
-  "BaseAddress": "https://staging-katana-02-dub.bf.unity3d.com",
-  //"BaseAddress": "https://staging-katana.bf.unity3d.com",
-  "DefaultProject": "Unity"
+{  
+  "LogFileFolder": "C:\\Users\\jinxu\\Documents\\GitHub\\katana\\test\\log\\"  
 }
