@@ -10,6 +10,7 @@ from buildbot.process import properties
 from buildbot.process.slavebuilder import IDLE, BUILDING
 from buildbot.process.buildrequest import BuildRequest
 from buildbot.steps.resumebuild import ResumeBuild, ShellCommandResumeBuild
+import ntpath
 
 # Change artifact location in August
 # datetime.datetime(2017, 7, 31, 23, 59, 59, tzinfo=UTC)
@@ -362,11 +363,11 @@ def rsyncWithRetry(step, origin, destination, port=None):
 
     return retryCommandLinuxOS(rsync_command)
 
-def mkDir(step):
+def mkDir(step, dir):
     if _isWindowsSlave(step):
-        return r'C:\cygwin64\bin\mkdir.exe'
+        return ['mkdir', ntpath.normpath(dir) ]
     else:
-        return 'mkdir'
+        return ['mkdir', '-p', dir]
 
 
 def getRemoteLocation(artifactServer, artifactServerDir, artifactPath, artifact):
@@ -488,13 +489,13 @@ class DownloadArtifactsFromChildren(LoggingBuildStep, CompositeStepMixin):
                  artifactServer,
                  artifactServerDir,
                  artifactBuilderName,
-                 workDir='',
+                 workdir='',
                  artifactServerPort=None,
                  artifactDestination=None,
                  artifactDirectory=None,
                  usePowerShell=True,
                  **kwargs):
-        self.workDir = workDir
+        self.workdir = workdir
         self.artifactBuilderName = artifactBuilderName
         self.artifactDirectory = artifactDirectory
         self.artifactServer = artifactServer
@@ -520,7 +521,7 @@ class DownloadArtifactsFromChildren(LoggingBuildStep, CompositeStepMixin):
             buildRequest = yield self.master.db.buildrequests.getBuildRequestById(brid)
 
             localdir = self._getLocalDir(brid)
-            command = [mkDir(self), '-p', localdir]
+            command = mkDir(self, localdir)
             yield self._docmd(command)
 
             remotelocation = self._getRemoteLocation(buildRequest)
@@ -556,7 +557,7 @@ class DownloadArtifactsFromChildren(LoggingBuildStep, CompositeStepMixin):
         if not command:
             raise ValueError("No command specified")
         from buildbot.process import buildstep
-        cmd = buildstep.RemoteShellCommand(self.workDir,
+        cmd = buildstep.RemoteShellCommand(self.workdir,
                 command, collectStdout=False,
                 collectStderr=True)
         cmd.useLog(self.stdio_log, False)
