@@ -65,7 +65,8 @@ namespace Unity.Katana.IntegrationTests.Tests
             var branch = katanabuilder.Branch;            
             Assert.True(revision_list.Count >= 5, "Test need at least 5 revision string");
             TestLog($"Read parameter project : {project}, builder: {builder}, branch: {branch}", _logger);
-            bool isWaiting = false;            
+            bool isWaiting = false;
+            await FreeAllSlavesOfABuilder(client, builder);
             #endregion
 
             #region action
@@ -349,8 +350,8 @@ namespace Unity.Katana.IntegrationTests.Tests
             
             string _baseAddress = settings["BaseAddress"].ToString();
             client.SetBaseAddress(_baseAddress);
-            TestLog($"Set base address {_baseAddress}", _logger);
-                                    
+            TestLog($"Set base address {_baseAddress}", _logger);            
+            
             bool isWaiting = false;            
             #endregion
 

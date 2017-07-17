@@ -28,22 +28,29 @@ namespace Unity.Katana.IntegrationTests.Tests
 
         protected void TestLog(string msg, ILogger logger, string level = "Information")
         {
-            switch (level)
+            if (logger != null)
             {
-                case "Information":
-                    logger.Information(msg);                    
-                    break;
-                case "Warning":
-                    logger.Warning(msg);                    
-                    break;
-                case "Error":
-                    logger.Error(msg);
-                    break;
-                default:
-                    logger.Information(msg);
-                    break;
+                switch (level)
+                {
+                    case "Information":
+                        logger.Information(msg);
+                        break;
+                    case "Warning":
+                        logger.Warning(msg);
+                        break;
+                    case "Error":
+                        logger.Error(msg);
+                        break;
+                    default:
+                        logger.Information(msg);
+                        break;
+                }
+                Trace.WriteLine(msg);
             }
-            Trace.WriteLine(msg);
+            else
+            {
+                Trace.WriteLine("Logger is null, nothing logged");
+            }
         }
 
         protected string SetupLogFileName(string testcasename, string folder = "")
@@ -156,7 +163,8 @@ namespace Unity.Katana.IntegrationTests.Tests
         public void WaitPendingBuildRequestListEmpty(KatanaClient client, 
                                                      string builder, 
                                                      int t = 5, 
-                                                     List<string> revisions = null)
+                                                     List<string> revisions = null,
+                                                     ILogger logger = null)
         {
             int cnt = 0;
             var response = client.GetPendingBuilds(builder);
@@ -170,6 +178,7 @@ namespace Unity.Katana.IntegrationTests.Tests
                     foreach (var content in contents)
                     {
                         var build_revision = content["source"]["revision_short"].ToString();
+                        TestLog($"Found build revision {build_revision} on {builder}", _logger);
                         if (revisions.Contains(build_revision))
                         {
                             matchfound = true;
@@ -206,20 +215,23 @@ namespace Unity.Katana.IntegrationTests.Tests
             // risk: maybe there are multiple build on a slave, need check how to do that.
         }
 
-        protected async Task StopRunningBuildsOnAllSlave(KatanaClient client, JObject slavearray)
+        protected async Task StopRunningBuildsOnAllSlave(KatanaClient client, JObject slavearray, ILogger logger = null)
         {
             foreach (var kvp in slavearray)
             {
+                string slavename = kvp.Key;
                 JObject slave = (JObject)kvp.Value;
                 JArray runningBuilds = (JArray)slave["runningBuilds"];
                 if (runningBuilds != null)
                 {
                     if (runningBuilds.Count() > 0)
                     {
+                        TestLog($"Found {runningBuilds.Count()} builds are running on {slavename}.", logger);
                         foreach (var build in runningBuilds)
                         {
                             string buildurl = build["builder_url"].ToString();
                             string buildnr = build["number"].ToString();
+                            TestLog($"Stop build number {buildnr} on {slavename}", logger);
                             buildurl.Replace("?", $"/builds/{buildnr}/stop?");
                             await client.StopBuild(buildurl);
                         }
@@ -228,7 +240,7 @@ namespace Unity.Katana.IntegrationTests.Tests
             }
         }
 
- 
+
         /// <summary>
         /// Check the pending build request list, If there is a pending builds, stop the running build on the builder.
         /// </summary>
@@ -236,7 +248,9 @@ namespace Unity.Katana.IntegrationTests.Tests
         /// <param name="project"></param>
         /// <param name="builder"></param>
         /// <param name="branch"></param>
-        public async Task StopCurrentBuildsIfPending(KatanaClient client, string project, string builder, string branch)
+        public async Task StopCurrentBuildsIfPending(KatanaClient client,
+                                                     string project, string builder, string branch,
+                                                     ILogger logger = null)
         {
             var response = client.GetPendingBuilds(builder);
             string response_string = response.Result.Content.ReadAsStringAsync().Result;
@@ -247,6 +261,7 @@ namespace Unity.Katana.IntegrationTests.Tests
                 foreach (var build in resp["currentBuilds"])
                 {
                     string _nr = build["number"].ToString();
+                    TestLog($"Stop builder number {_nr} on builder {builder}", logger);
                     await client.StopBuild(project, builder, _nr, branch);
                 }                
             }

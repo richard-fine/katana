@@ -275,7 +275,7 @@ namespace Unity.Katana.IntegrationTests.Tests
             bool isPengingBuild = true;
             while (isPengingBuild)
             {
-                await StopCurrentBuildsIfPending(client, project, builder, branch);
+                await StopCurrentBuildsIfPending(client, project, builder, branch, _logger);
                 var response = client.GetPendingBuilds(builder);
                 JArray contents = JArray.Parse(response.Result.Content.ReadAsStringAsync().Result);
                 if (contents.Count < 1)
