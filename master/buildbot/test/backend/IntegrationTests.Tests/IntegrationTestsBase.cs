@@ -178,7 +178,7 @@ namespace Unity.Katana.IntegrationTests.Tests
                     foreach (var content in contents)
                     {
                         var build_revision = content["source"]["revision_short"].ToString();
-                        TestLog($"Found build revision {build_revision} on {builder}", _logger);
+                        TestLog($"Found build revision {build_revision} on {builder}", logger);
                         if (revisions.Contains(build_revision))
                         {
                             matchfound = true;
