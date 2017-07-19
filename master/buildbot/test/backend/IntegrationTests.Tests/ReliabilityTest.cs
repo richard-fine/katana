@@ -99,7 +99,7 @@ namespace Unity.Katana.IntegrationTests.Tests
                 {
                     counter++;
                     if (counter > 60)
-                        Assert.True(false, "Testcase failed after running for 2 minutes");
+                        Assert.True(false, "Testcase failed after running for 5 minutes");
 
                     //// Stop the setup builds if they are running ////
                     build1 = client.GetBuildNumberFromRevisionAndTime(revision_list[0], builder, 0, 40, 5);
@@ -378,7 +378,7 @@ namespace Unity.Katana.IntegrationTests.Tests
                 {
                     counter++;
                     if (counter > 60)
-                        Assert.True(false, "Testcase failed after running for 2 minutes");
+                        Assert.True(false, "Testcase failed after running for 5 minutes");
 
                     //// Stop the setup builds if they are running ////
                     foreach (var katanabuild in katanabuilds)
@@ -386,6 +386,8 @@ namespace Unity.Katana.IntegrationTests.Tests
                         katanabuild.Build =
                             client.GetBuildNumberFromRevisionAndTime(katanabuild.Revision,
                                                                     katanabuild.Builder.Builder, 0, 50, 3);
+                        TestLog($"{katanabuild.Builder.Builder} has start a build with number {katanabuild.Build}", 
+                                _logger);
                         if (katanabuild.Build >= 0)
                         {
                             Func<Task> func = async () => await client.StopBuild(katanabuild, isWaiting);
@@ -429,129 +431,223 @@ namespace Unity.Katana.IntegrationTests.Tests
         [Trait("Status", "Unstable")]
         public async Task ReprocudeRacingErrorTest()
         {
-            #region arrange
-            string testcasename = GetTestcaseName();
-            TextWriterTraceListener myTextListener = SetupTraceFile($"{testcasename}.log");
-            var client = new KatanaClient();
-
-            JObject settings = JObject.Parse(File.ReadAllText(settingfile));
-            string _baseAddress = settings["BaseAddress"].ToString();
-            client.SetBaseAddress(_baseAddress);
-            Trace.WriteLine($"Set base address {_baseAddress}");
-            var setup = settings["TestSetup"].Where(x => (string)x["name"] == testcasename).ToArray().First();
-            var project = setup["project"].ToString();
-            var builder = setup["builder"].ToString();
-            var branch = setup["branch"].ToString();
-            JArray revisions = (JArray)setup["revisions"];
-            List<string> revision_list = new List<string>();
-            foreach (var rev in revisions)
+            for (int i = 0; i < 100; i++)
             {
-                revision_list.Add(rev.ToString());
-            }
-            Assert.True(revision_list.Count >= 5, "Test need at least 5 revision string");
-            Trace.WriteLine($"Read parameter project : {project}, builder: {builder}, branch: {branch}");
-            //await FreeAllSlavesOfABuilder(client, builder);
-            #endregion
+                #region arrange
+                string testcasename = GetTestcaseName();
+                TextWriterTraceListener myTextListener = SetupTraceFile($"{testcasename}.log");
+                var client = new KatanaClient();
 
-            #region action
-            //// launch 2 setup builds to make the slave busy  ////
-            await client.LaunchBuild(project, builder, branch, revision_list[0], "99");
-            await client.LaunchBuild(project, builder, branch, revision_list[1], "99");
-            Trace.WriteLine("Two setup builds are launched");
-            Thread.Sleep(3000);
-            //// launch 3 test builds. ////
-            await client.LaunchBuild(project, builder, branch, revision_list[2], "10");
-            await client.LaunchBuild(project, builder, branch, revision_list[3], "90");
-            await client.LaunchBuild(project, builder, branch, revision_list[4], "40");
-            Trace.WriteLine("Three setup builds are launched");
-
-            bool isBuild1Stopped = false;
-            bool isBuild2Stopped = false;
-            int counter = 0;
-            int build1 = -1;
-            int build2 = -1;
-            int build3 = -1;
-
-            //// Wait until all the test build is running ////
-            while (!isBuild1Stopped || !isBuild2Stopped)
+                JObject settings = JObject.Parse(File.ReadAllText(settingfile));
+                string _baseAddress = settings["BaseAddress"].ToString();
+                client.SetBaseAddress(_baseAddress);
+                Trace.WriteLine($"Set base address {_baseAddress}");
+                //var setup = settings["TestSetup"].Where(x => (string)x["name"] == testcasename).ToArray().First();
+                var project = "Unity";
+                var builder = "proj0-Test DeploymentTests - Services - Tizen";
+                var branch = "trunk";
+                //JArray revisions = (JArray)setup["revisions"];
+                List<string> revision_list = new List<string>()
             {
-                counter++;
-                if (counter > 60)
-                    Assert.True(false, "Testcase failed after running for 5 minutes");
+                "24c95392f5c2",
+                "8d4e8eefeb52",
+                "32e0dff84ceb",
+                "9683b9f88e0e",
+                "43294e7c9854"};
 
-                //// Stop the setup builds if they are running ////
-                build1 = client.GetBuildNumberFromRevision(revision_list[0], builder);
-                build2 = client.GetBuildNumberFromRevision(revision_list[1], builder);
-                if (build1 >= 0)
+
+                Assert.True(revision_list.Count >= 5, "Test need at least 5 revision string");
+                Trace.WriteLine($"Read parameter project : {project}, builder: {builder}, branch: {branch}");
+                //await FreeAllSlavesOfABuilder(client, builder);
+                #endregion
+
+                #region action
+                //// launch 2 setup builds to make the slave busy  ////
+                await client.LaunchBuild(project, builder, branch, revision_list[0], "99");
+                await client.LaunchBuild(project, builder, branch, revision_list[1], "99");
+                Trace.WriteLine("Two setup builds are launched");
+                Thread.Sleep(3000);
+                //// launch 3 test builds. ////
+                await client.LaunchBuild(project, builder, branch, revision_list[2], "10");
+                await client.LaunchBuild(project, builder, branch, revision_list[3], "90");
+                await client.LaunchBuild(project, builder, branch, revision_list[4], "40");
+                Trace.WriteLine("Three setup builds are launched");
+
+                bool isBuild1Stopped = false;
+                bool isBuild2Stopped = false;
+                int counter = 0;
+                int build1 = -1;
+                int build2 = -1;
+                int build3 = -1;
+
+                //// Wait until all the test build is running ////
+                while (!isBuild1Stopped || !isBuild2Stopped)
                 {
-                    client.StopBuild(project, builder, build1.ToString(), branch);
-                    Trace.WriteLine($"Stopping build {build1}");
-                    //Thread.Sleep(1000);
-                    isBuild1Stopped = true;
-                }
-                if (build2 >= 0)
-                {
-                    client.StopBuild(project, builder, build2.ToString(), branch);
-                    Trace.WriteLine($"Stopping build {build2}");
-                    //Thread.Sleep(1000);
-                    isBuild2Stopped = true;
+                    counter++;
+                    if (counter > 60)
+                        Assert.True(false, "Testcase failed after running for 5 minutes");
+
+                    //// Stop the setup builds if they are running ////
+                    build1 = client.GetBuildNumberFromRevision(revision_list[0], builder);
+                    build2 = client.GetBuildNumberFromRevision(revision_list[1], builder);
+                    if (build1 >= 0)
+                    {
+                        client.StopBuild(project, builder, build1.ToString(), branch);
+                        Trace.WriteLine($"Stopping build {build1}");
+                        //Thread.Sleep(1000);
+                        isBuild1Stopped = true;
+                    }
+                    if (build2 >= 0)
+                    {
+                        client.StopBuild(project, builder, build2.ToString(), branch);
+                        Trace.WriteLine($"Stopping build {build2}");
+                        //Thread.Sleep(1000);
+                        isBuild2Stopped = true;
+                    }
+
+                    Thread.Sleep(2000);
                 }
 
-                Thread.Sleep(2000);
+                isBuild1Stopped = false;
+                isBuild2Stopped = false;
+                bool isBuild3Stopped = false;
+                counter = 0;
+                while (!isBuild1Stopped || !isBuild2Stopped || !isBuild3Stopped)
+                {
+                    counter++;
+                    if (counter > 60)
+                        Assert.True(false, "Testcase failed after running for 5 minutes");
+                    //// Read the build number ////
+                    int _build1 = client.GetBuildNumberFromRevision(revision_list[2], builder);
+                    int _build2 = client.GetBuildNumberFromRevision(revision_list[3], builder);
+                    int _build3 = client.GetBuildNumberFromRevision(revision_list[4], builder);
+
+                    if (_build1 >= 0)
+                    {
+                        build1 = _build1;
+                        client.StopBuild(project, builder, build1.ToString(), branch);
+                        Trace.WriteLine($"Stopping build {build1}");
+                        //Thread.Sleep(1000);
+                        isBuild1Stopped = true;
+
+                    }
+                    if (_build2 >= 0)
+                    {
+                        build2 = _build2;
+                        client.StopBuild(project, builder, build2.ToString(), branch);
+                        Trace.WriteLine($"Stopping build {build2}");
+                        //Thread.Sleep(1000);
+                        isBuild2Stopped = true;
+                    }
+
+                    if (_build3 >= 0)
+                    {
+                        build3 = _build3;
+                        client.StopBuild(project, builder, build3.ToString(), branch);
+                        Console.WriteLine($"Stopping build {build3}");
+                        //Thread.Sleep(1000);
+                        isBuild3Stopped = true;
+                    }
+
+                    Trace.WriteLine($"builds number : {build1}, {build2}, {build3}");
+                    if (!isBuild1Stopped || !isBuild2Stopped || !isBuild3Stopped)
+                        Trace.WriteLine("not all the builds are running,  refresh after 5 seconds");
+                    Thread.Sleep(2000);
+                }
+                #endregion
+
+                #region clean up and assertion            
+                WriteTraceToFile(myTextListener);
+                //await client.StopAllBuildOnBuilder(project, builder, branch);            
+                #endregion
             }
 
-            isBuild1Stopped = false;
-            isBuild2Stopped = false;
-            bool isBuild3Stopped = false;
-            counter = 0;
-            while (!isBuild1Stopped || !isBuild2Stopped || !isBuild3Stopped)
+        }
+
+        [Fact]
+        [Trait("Status", "Unstable")]
+        public async Task TriggerBuildToReproduceErrorTest()
+        {
+            for (int i = 0; i < 100; i++)
             {
-                counter++;
-                if (counter > 60)
-                    Assert.True(false, "Testcase failed after running for 5 minutes");
-                //// Read the build number ////
-                int _build1 = client.GetBuildNumberFromRevision(revision_list[2], builder);
-                int _build2 = client.GetBuildNumberFromRevision(revision_list[3], builder);
-                int _build3 = client.GetBuildNumberFromRevision(revision_list[4], builder);
+                #region arrange
+                TextWriterTraceListener myTextListener = SetupTraceFile("TriggerBuildTest.log");
+                var client = new KatanaClient();
 
-                if (_build1 >= 0)
+                JObject settings = JObject.Parse(File.ReadAllText(settingfile));
+                string _baseAddress = settings["BaseAddress"].ToString();
+                client.SetBaseAddress(_baseAddress);
+                Trace.WriteLine($"Set base address {_baseAddress}");
+                //var setup = settings["TestSetup"].Where(x => (string)x["name"] == "default").ToArray().First();
+                var project = "Unity";
+                var builder = "proj0-Test DeploymentTests - Services - Tizen";
+                var branch = "trunk";
+                Trace.WriteLine($"Read parameter project : {project}, builder: {builder}, branch: {branch}");
+
+                #endregion
+
+                #region action
+                //// launch 2 setup builds to make the slave busy  ////
+                await client.LaunchBuild(project, builder, branch, "24c95392f5c2", "99");
+                await client.LaunchBuild(project, builder, branch, "8d4e8eefeb52", "99");
+                Trace.WriteLine("Two setup builds are launched");
+                Thread.Sleep(3000);
+                //// launch 3 test builds. ////
+                await client.LaunchBuild(project, builder, branch, "32e0dff84ceb", "10");
+                await client.LaunchBuild(project, builder, branch, "9683b9f88e0e", "90");
+                await client.LaunchBuild(project, builder, branch, "43294e7c9854", "40");
+                Trace.WriteLine("Three setup builds are launched");
+
+                bool isAllRunning = false;
+                int counter = 0;
+                int build1 = -1;
+                int build2 = -1;
+                int build3 = -1;
+
+                //// Wait until all the test build is running ////
+                while (!isAllRunning)
                 {
-                    build1 = _build1;
-                    client.StopBuild(project, builder, build1.ToString(), branch);
-                    Trace.WriteLine($"Stopping build {build1}");
-                    //Thread.Sleep(1000);
-                    isBuild1Stopped = true;
+                    counter++;
+                    if (counter > 60)
+                        Assert.True(false, "Testcase failed after running for 5 minutes");
 
-                }
-                if (_build2 >= 0)
-                {
-                    build2 = _build2;
-                    client.StopBuild(project, builder, build2.ToString(), branch);
-                    Trace.WriteLine($"Stopping build {build2}");
-                    //Thread.Sleep(1000);
-                    isBuild2Stopped = true;
-                }
+                    //// Stop the setup builds if they are running ////
+                    build1 = client.GetBuildNumberFromRevision("24c95392f5c2", builder);
+                    build2 = client.GetBuildNumberFromRevision("8d4e8eefeb52", builder);
+                    if (build1 >= 0)
+                    {
+                        await client.StopBuild(project, builder, build1.ToString(), branch);
+                        Trace.WriteLine($"Stopping build {build1}");
+                    }
+                    if (build2 >= 0)
+                    {
+                        await client.StopBuild(project, builder, build2.ToString(), branch);
+                        Trace.WriteLine($"Stopping build {build2}");
+                    }
 
-                if (_build3 >= 0)
-                {
-                    build3 = _build3;
-                    client.StopBuild(project, builder, build3.ToString(), branch);
-                    Console.WriteLine($"Stopping build {build3}");
-                    //Thread.Sleep(1000);
-                    isBuild3Stopped = true;
-                }
 
-                Trace.WriteLine($"builds number : {build1}, {build2}, {build3}");
-                if (!isBuild1Stopped || !isBuild2Stopped || !isBuild3Stopped)
-                    Trace.WriteLine("not all the builds are running,  refresh after 5 seconds");
-                Thread.Sleep(2000);
+                    //// Read the build number ////
+                    build1 = client.GetBuildNumberFromRevision("32e0dff84ceb", builder);
+                    build2 = client.GetBuildNumberFromRevision("9683b9f88e0e", builder);
+                    build3 = client.GetBuildNumberFromRevision("43294e7c9854", builder);
+
+                    isAllRunning = (build1 >= 0) && (build2 >= 0) && (build3 >= 0);
+                    Trace.WriteLine($"builds number : {build1}, {build2}, {build3}");
+                    if (!isAllRunning)
+                        Trace.WriteLine($"not all the builds are running, {build1}, {build2} {build3}, " +
+                            $"refresh after 5 seconds");
+                    Thread.Sleep(5000);
+                }
+                #endregion
+
+                #region clean up and assertion            
+                WriteTraceToFile(myTextListener);
+                await client.StopAllBuildOnBuilder(project, builder, branch);
+                (build1 > build3 && build3 > build2).Should().BeTrue("The build number should be ordered " +
+                    "accodring to their priority");
+                #endregion
             }
-            #endregion
-
-            #region clean up and assertion            
-            WriteTraceToFile(myTextListener);
-            //await client.StopAllBuildOnBuilder(project, builder, branch);            
-            #endregion
+            Thread.Sleep(5000);
         }
     }
 }
