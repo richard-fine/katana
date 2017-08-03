@@ -88,8 +88,7 @@ define(function (require) {
                 {"mData": null, "sTitle": "#", "sWidth": "8%"},
                 {"mData": null, "sTitle": "Current build", "sWidth": "27%"},
                 {"mData": null, "sTitle": "Revision", "sWidth": "30%"},
-                {"mData": null, "sTitle": "Author", "sWidth": "19%", "sClass": "txt-align-right"}
-                ,
+                {"mData": null, "sTitle": "Author", "sWidth": "19%", "sClass": "txt-align-right"},
                 {"mData": null, "sTitle": "Tags", "sWidth": "16%"}
             ];
 
