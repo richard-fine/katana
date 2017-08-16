@@ -50,6 +50,16 @@ class JSONTestResource(HtmlResource):
         cxt['splitext'] = splitext
         cxt['selectedproject'] = project
         cxt['removeTestFilter'] = removeTestFilter
+        cxt['results'] = {
+            0: 'Inconclusive',
+            1: 'NotRunnable',
+            2: 'Skipped',
+            3: 'Ignored',
+            4: 'Success',
+            5: 'Failed',
+            6: 'Error',
+            7: 'Cancelled'
+        }
 
         json_data = None
         error_message = None
@@ -92,17 +102,6 @@ class JSONTestResource(HtmlResource):
         if error_message is not None:
             cxt['data_error'] = error_message
             log.msg(error_message)
-
-        cxt['results'] = {
-            0: 'Inconclusive',
-            1: 'NotRunnable',
-            2: 'Skipped',
-            3: 'Ignored',
-            4: 'Success',
-            5: 'Failed',
-            6: 'Error',
-            7: 'Cancelled'
-        }
 
         template = req.site.buildbot_service.templates.get_template("jsontestresults.html")
         return template.render(**cxt)
