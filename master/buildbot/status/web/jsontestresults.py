@@ -51,11 +51,34 @@ class JSONTestResource(HtmlResource):
         cxt['selectedproject'] = project
         cxt['removeTestFilter'] = removeTestFilter
 
-        json_data = {}
+        json_data = None
         error_message = None
 
         try:
             json_data = json.loads(self.log.getText())
+
+            if json_data is not None:
+                if 'summary' in json_data:
+                    success_count = json_data['summary']['successCount']
+                    total_count = json_data['summary']['testsCount']
+                    if success_count != 0 and total_count != 0:
+                        success_per = (float(success_count) / float(total_count)) * 100.0
+                        json_data['summary']['success_rate'] = success_per
+
+                json_data['filters'] = {
+                    'Inconclusive': True,
+                    'Skipped': False,
+                    'Ignored': False,
+                    'Success': False,
+                    'Failed': True,
+                    'Error': True,
+                    'Cancelled': True
+                }
+
+                cxt['data'] = json_data
+            else:
+                error_message = "[{0}] Error occurred while parsing JSON test report data" \
+                    .format(self.__class__.__name__)
         except KeyError as e:
             error_message = "[{0}] Key error in json: {1}".format(self.__class__.__name__, e)
         except:
@@ -66,32 +89,9 @@ class JSONTestResource(HtmlResource):
             error_message = "[{0}] Unexpected exception caught while loading JSON test report data: {1}"\
                 .format(self.__class__.__name__, '\n\t'.join(formatted.splitlines()))
 
-        if json_data is None:
-            error_message = "{0}: Error occurred while parsing JSON test report data"\
-                .format(self.__class__.__name__)
-
         if error_message is not None:
             cxt['data_error'] = error_message
             log.msg(error_message)
-
-        cxt['data'] = json_data
-
-        if 'summary' in json_data:
-            success_count = json_data['summary']['successCount']
-            total_count = json_data['summary']['testsCount']
-            if success_count != 0 and total_count != 0:
-                success_per = (float(success_count) / float(total_count)) * 100.0
-                json_data['summary']['success_rate'] = success_per
-
-        json_data['filters'] = {
-            'Inconclusive': True,
-            'Skipped': False,
-            'Ignored': False,
-            'Success': False,
-            'Failed': True,
-            'Error': True,
-            'Cancelled': True
-        }
 
         cxt['results'] = {
             0: 'Inconclusive',
