@@ -502,9 +502,11 @@ class DownloadArtifactsFromChildren(LoggingBuildStep, CompositeStepMixin):
                  artifactServerPort=None,
                  artifactDestination=None,
                  artifactDirectory=None,
+                 artifact=None,
                  usePowerShell=True,
                  **kwargs):
         self.workdir = workdir
+        self.artifact = artifact
         self.artifactBuilderName = artifactBuilderName
         self.artifactDirectory = artifactDirectory
         self.artifactServer = artifactServer
@@ -526,6 +528,8 @@ class DownloadArtifactsFromChildren(LoggingBuildStep, CompositeStepMixin):
         buildRequetsIdsWithArtifacts = self._getBuildRequestIdsWithArtifacts(partitionRequests)
         self.partitionCount = len(buildRequetsIdsWithArtifacts)
         self.step_status.setText(["Downloading artifacts from %d triggered partitions" % self.partitionCount])
+        artifactsMap = {}
+        self.build.setProperty("artifactsMap", {})
         for brid in buildRequetsIdsWithArtifacts:
             buildRequest = yield self.master.db.buildrequests.getBuildRequestById(brid)
 
@@ -533,10 +537,18 @@ class DownloadArtifactsFromChildren(LoggingBuildStep, CompositeStepMixin):
             command = mkDir(self, localdir)
             yield self._docmd(command)
 
-            remotelocation = self._getRemoteLocation(buildRequest)
+            artifactPath = self._getArtifactPath(buildRequest)
+            remotelocation = self._getRemoteLocation(artifactPath)
+
             rsync = rsyncWithRetry(self, remotelocation, localdir, self.artifactServerPort)
             yield self._docmd(rsync)
 
+            if self.artifact:
+                artifactsMap[localdir] = artifactPath + '/' + self.artifact
+            else:
+                artifactsMap[localdir] = artifactPath + '/'
+
+        self.build.setProperty('artifactsMap', artifactsMap, 'DownloadArtifactsFromChildren')
         self.finished(SUCCESS)
 
     def finished(self, results):
@@ -554,16 +566,21 @@ class DownloadArtifactsFromChildren(LoggingBuildStep, CompositeStepMixin):
             localdir = self.artifactDestination + '/' + localdir
         return localdir
 
-    def _getRemoteLocation(self, buildRequest):
-        artifactPath = '';
-        if buildRequest["submitted_at"] > ARTIFACT_LOCATION_CHANGE_DATE:
-            artifactPath = "%s/%s_%s" % (
-            safeTranslate(self.artifactBuilderName), buildRequest['brid'], FormatDatetime(buildRequest["submitted_at"]))
-        else:
-            artifactPath = "%s_%s_%s" % (
-            safeTranslate(self.artifactBuilderName), buildRequest['brid'], FormatDatetime(buildRequest["submitted_at"]))
+    def _getArtifactPath(self, buildRequest):
+        artifactPath = "%s/%s_%s" % (
+            safeTranslate(self.artifactBuilderName),
+            buildRequest['brid'],
+            FormatDatetime(buildRequest["submitted_at"])
+        )
+        if self.artifactDirectory:
+            artifactPath += "/%s" % self.artifactDirectory
+        return artifactPath
 
-        return getRemoteLocation(self.artifactServer, self.artifactServerDir, artifactPath, "")
+    def _getRemoteLocation(self,  artifactPath):
+        if (self.artifact):
+            return getRemoteLocation(self.artifactServer, self.artifactServerDir, artifactPath, self.artifact)
+        else:
+            return getRemoteLocation(self.artifactServer, self.artifactServerDir, artifactPath, "")
 
     def _docmd(self, command):
         if not command:
