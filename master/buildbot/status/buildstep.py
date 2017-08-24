@@ -62,6 +62,7 @@ class BuildStepStatus(styles.Versioned):
     statistics = {}
     step_number = None
     hidden = False
+    isTrigger = False
 
     def __init__(self, parent, master, step_number, step_type):
         assert interfaces.IBuildStatus(parent)
@@ -77,7 +78,7 @@ class BuildStepStatus(styles.Versioned):
         self.skipped = False
 
         self.master = master
-
+        self.isTrigger = False
         self.waitingForLocks = False
         self.step_type = str(step_type)
 
@@ -227,6 +228,9 @@ class BuildStepStatus(styles.Versioned):
 
     def setHidden(self, hidden):
         self.hidden = hidden
+
+    def setIsTrigger(self, isTrigger):
+        self.isTrigger = isTrigger
 
     def stepStarted(self):
         self.started = util.now()

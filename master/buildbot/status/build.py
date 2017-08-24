@@ -631,7 +631,7 @@ class BuildStatus(styles.Versioned, properties.PropertiesMixin):
 
     def get_trigger_steps_time(self):
         trigger = 0
-        trigger_steps = [step.finished - step.started for step in self.steps if step.finished and str(TriggerType) == step.step_type ]
+        trigger_steps = [step.finished - step.started for step in self.steps if step.finished and step.isTrigger]
         if len(trigger_steps) > 0:
             trigger = reduce(lambda x, y: x + y, trigger_steps)
 

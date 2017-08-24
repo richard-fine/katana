@@ -472,6 +472,7 @@ class BuildStep(object, properties.PropertiesMixin):
     alwaysRun = False
     doStepIf = True
     hideStepIf = False
+    isTrigger = False
 
     # properties set on a build step are, by nature, always runtime properties
     set_runtime_properties = True
@@ -495,6 +496,7 @@ class BuildStep(object, properties.PropertiesMixin):
              'useProgress',
              'doStepIf',
              'hideStepIf',
+             'isTrigger'
              ]
 
     name = "generic"
@@ -619,6 +621,7 @@ class BuildStep(object, properties.PropertiesMixin):
         # Set the step's text here so that the stepStarted notification sees
         # the correct description
         self.step_status.setText(self.describe(False))
+        self.step_status.setIsTrigger(self.isTrigger)
         self.step_status.stepStarted()
 
         d = self.acquireLocks()
